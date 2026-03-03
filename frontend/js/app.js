@@ -257,7 +257,7 @@ const app=(()=>{
     if(typeof RTCPeerConnection==='undefined'){loadHls(vid,fallbackUrl,oId,key);return;}
 
     const pc=new RTCPeerConnection({
-      iceServers:[],          // MediaMTX ice-lite 不需要 STUN
+      iceServers:[],          //  ice-lite 不需要 STUN
       bundlePolicy:'max-bundle',
       rtcpMuxPolicy:'require',
     });

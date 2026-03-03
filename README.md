@@ -73,42 +73,40 @@ rtsp-viewer/
 | Requirement | Version |
 |-------------|---------|
 | Python      | 3.10+   |
-| MediaMTX    | latest  |
-| ffmpeg / ffprobe | 4.0+ (optional, for stream probing) |
+| Ubuntu / Debian Linux | — |
 | Browser     | Chrome / Edge / Firefox (HLS.js / WebRTC support) |
+
+> `ffmpeg`, `python3-venv`, and `MediaMTX` are installed automatically by `install.sh`.
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Install MediaMTX
-
-Download the binary from the [MediaMTX releases page](https://github.com/bluenviron/mediamtx/releases) and place it somewhere on your `$PATH`:
-
-```bash
-# Example for Linux amd64
-wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_amd64.tar.gz
-tar -xzf mediamtx_linux_amd64.tar.gz
-sudo mv mediamtx /usr/local/bin/
-```
-
-### 2. Clone / Enter the project
+### 1. Clone / Enter the project
 
 ```bash
 cd /home/jetseaai/rtsp-viewer
 ```
 
+### 2. Install all dependencies (first time only)
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+> **`install.sh` automatically handles:**
+> - ✅ Installs `ffmpeg` and `python3-venv` via `apt`
+> - ✅ Downloads and installs **MediaMTX** (auto-detects CPU architecture: amd64 / arm64 / armv7)
+> - ✅ Creates `backend/venv/`
+> - ✅ Installs all Python dependencies from `requirements.txt`
+
 ### 3. Start all services
 
 ```bash
-chmod +x start-linux.sh
 ./start-linux.sh
 ```
 
-> **No manual setup needed.** The script automatically handles everything:
-> - ✅ Verifies `mediamtx` is installed
-> - ✅ Creates `backend/venv/` if it does not exist
-> - ✅ Installs / updates Python dependencies from `requirements.txt`
 > - ✅ Starts **MediaMTX** with `mediamtx.yml` (logs → `mediamtx.log`)
 > - ✅ Starts **FastAPI** backend with `uvicorn` on port **8080** (logs → `/tmp/backend.log`)
 
@@ -237,22 +235,29 @@ http://localhost:8080/docs
 
 ---
 
-## 🛠 Manual Setup (advanced, without the shell script)
+## 🛠 Manual Setup (advanced, without the shell scripts)
 
-> If you prefer to start services individually instead of using `start-linux.sh`.
+> For advanced users who prefer to run services individually.
 
 ```bash
-# 1. Create and activate virtual environment
+# 1. Install system dependencies
+sudo apt update && sudo apt install -y ffmpeg python3-venv
+
+# 2. Install MediaMTX manually
+#    Download from: https://github.com/bluenviron/mediamtx/releases
+sudo mv mediamtx /usr/local/bin/
+
+# 3. Create Python virtual environment
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 2. Start MediaMTX (from project root)
+# 4. Start MediaMTX (from project root)
 cd ..
 mediamtx mediamtx.yml &
 
-# 3. Start the backend
+# 5. Start the backend
 cd backend
 uvicorn main:app --host 0.0.0.0 --port 8080
 ```
