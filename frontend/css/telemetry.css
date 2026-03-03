@@ -1,0 +1,476 @@
+/* ── 遙測 HUD ─────────────────────────────────────────────────────────────── */
+.tele-hud{position:absolute;inset:0;z-index:7;pointer-events:none}
+
+/* ── 正上方三聯儀表列（SOG ← 羅盤 → THROTTLE）────────────────────────── */
+.tele-top-row{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:row;align-items:flex-end;gap:6px;
+  pointer-events:none;
+}
+/* 大羅盤外殼 */
+.hdg-compass-wrap{
+  position:relative;width:148px;height:148px;flex-shrink:0;
+}
+.hdg-compass-wrap svg{width:100%;height:100%}
+/* 羅盤中央數字 */
+.hdg-center{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none;
+}
+.hdg-num{
+  font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:700;
+  color:#f0a500;line-height:1;
+  text-shadow:0 0 18px rgba(240,165,0,.7),0 2px 8px rgba(0,0,0,.9);
+  letter-spacing:2px;
+}
+.hdg-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:3px;
+  color:rgba(255,255,255,.35);margin-top:3px;
+}
+/* COG 內嵌於羅盤中央 */
+.cog-inline{
+  display:flex;align-items:center;gap:4px;margin-top:2px;
+  font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1.5px;
+  color:rgba(64,196,255,.55);
+}
+.cog-inline-dot{
+  width:6px;height:6px;border-radius:50%;flex-shrink:0;
+  background:#40c4ff;box-shadow:0 0 4px rgba(64,196,255,.5);
+}
+.cog-inline-val{
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;
+  color:#40c4ff;letter-spacing:1px;
+  text-shadow:0 0 8px rgba(64,196,255,.4);
+}
+/* COG 羅盤針 */
+#cog-needle{transform-origin:74px 74px;transition:transform .15s ease-out}
+/* 羅盤主針 */
+#compass-needle{transform-origin:74px 74px;transition:transform .15s ease-out}
+/* SOG / THR 弧形動畫 */
+#sog-arc,#thr-arc{transition:stroke-dasharray .15s ease-out}
+/* 羅盤下方：COG / ROLL / PITCH 視覺化資訊帶 */
+.hdg-sub-row{
+  display:flex;gap:0;
+  background:rgba(8,14,24,.88);
+  border:1px solid rgba(240,165,0,.18);
+  border-top:none;border-radius:0 0 7px 7px;
+  overflow:hidden;
+  width:148px;
+}
+.hdg-sub-cell{
+  padding:5px 0 4px;text-align:center;flex:1;
+  font-family:'JetBrains Mono',monospace;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.hdg-sub-cell+.hdg-sub-cell{border-left:1px solid rgba(255,255,255,.06)}
+.hdg-sub-lbl{font-size:7.5px;letter-spacing:2px;color:rgba(255,255,255,.28);line-height:1}
+.hdg-sub-val{font-size:12px;font-weight:600;color:#eef2f7;line-height:1}
+/* COG mini 指向箭頭 SVG */
+.cog-arrow-wrap{width:22px;height:22px}
+.cog-arrow-wrap svg{width:100%;height:100%;overflow:visible}
+
+/* ── 右下角：SOG + THROTTLE 同心雙弧儀表 ──────────────────────────────── */
+.sog-thr-panel{
+  position:absolute;bottom:14px;right:14px;
+  background:rgba(6,11,20,.90);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  padding:10px 12px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:0;
+  backdrop-filter:blur(14px);
+  box-shadow:0 0 0 1px rgba(240,165,0,.06),
+             0 8px 40px rgba(0,0,0,.75),
+             inset 0 1px 0 rgba(255,255,255,.06);
+  pointer-events:none;
+  width:210px;
+}
+/* 面板標題列 */
+.dual-gauge-title{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;margin-bottom:6px;
+}
+.dual-gauge-title-item{
+  display:flex;align-items:center;gap:4px;
+}
+.dual-title-dot{
+  width:6px;height:6px;border-radius:50%;flex-shrink:0;
+}
+.dual-title-dot.sog{ background:#f0a500;box-shadow:0 0 6px rgba(240,165,0,.7); }
+.dual-title-dot.thr{ background:#00e676;box-shadow:0 0 6px rgba(0,230,118,.7); }
+.dual-title-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:2px;
+  color:rgba(255,255,255,.30);text-transform:uppercase;
+}
+/* 單一大 SVG 包裝 */
+.dual-gauge-wrap{
+  width:186px;height:120px;flex-shrink:0;
+}
+.dual-gauge-wrap svg{width:100%;height:100%}
+/* 數值列 (在 SVG 下方，不與指針重疊) */
+.dual-gauge-vals{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  width:100%;padding:6px 6px 0;
+  border-top:1px solid rgba(255,255,255,.07);
+  margin-top:2px;
+}
+.dual-val-block{
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+}
+.dual-val-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:2px;
+  color:rgba(255,255,255,.28);
+}
+.dual-val-num{
+  font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:700;
+  line-height:1;letter-spacing:1px;
+}
+.dual-val-num.sog{
+  color:#f0a500;
+  text-shadow:0 0 18px rgba(240,165,0,.65),0 0 36px rgba(240,165,0,.25);
+}
+.dual-val-num.thr{
+  color:#00e676;
+  text-shadow:0 0 18px rgba(0,230,118,.55),0 0 36px rgba(0,230,118,.2);
+}
+.dual-val-unit{
+  font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:2px;
+  color:rgba(255,255,255,.28);
+}
+/* 中間分隔線（兩個數值之間） */
+.dual-vals-sep{
+  width:1px;background:rgba(255,255,255,.08);
+  align-self:stretch;margin:0 4px;
+}
+
+/* ── 底部橫條：PORT · RUDDER · STBD（水平）────────────────────────────── */
+.tele-bottom-bar{
+  position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:row;align-items:flex-end;gap:6px;
+  pointer-events:none;
+}
+
+/* 引擎面板（PORT / STBD） */
+.eng-panel{
+  background:rgba(8,14,24,.82);border:1px solid rgba(255,255,255,.1);
+  border-radius:6px;padding:10px 14px;width:178px;backdrop-filter:blur(8px);
+}
+.eng-header{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;
+}
+.eng-name{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2.5px;
+  color:rgba(255,255,255,.4);
+}
+.gear-badge{
+  padding:3px 9px;border-radius:3px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;letter-spacing:1px;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--t-dim);
+  transition:all .3s;
+}
+.gear-badge.F{border-color:rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:#00e676}
+.gear-badge.R{border-color:rgba(255,61,87,.4);background:rgba(255,61,87,.1);color:#ff3d57}
+.gear-badge.N{border-color:rgba(240,165,0,.35);background:rgba(240,165,0,.08);color:#f0a500}
+.gear-badge.X{border-color:rgba(255,112,67,.4);background:rgba(255,112,67,.1);color:#ff7043}
+/* RPM 大值 */
+.eng-rpm-val{
+  font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:700;
+  color:#eef2f7;line-height:1;text-align:center;letter-spacing:1px;
+}
+.eng-rpm-unit{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.25);text-align:center;margin-top:2px}
+/* RPM 橫條 */
+.eng-bar-wrap{height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;margin:8px 0 7px}
+.eng-bar{height:100%;border-radius:3px;transition:width .15s ease-out;width:0%}
+.eng-bar.L{background:linear-gradient(90deg,#40c4ff,#00e676)}
+.eng-bar.R{background:linear-gradient(90deg,#f0a500,#ff7043)}
+/* 水平 Lever 進度條 */
+.eng-lever-label{font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:1.5px;color:rgba(255,255,255,.25);margin-bottom:4px;display:flex;justify-content:space-between}
+.eng-lever-track{
+  position:relative;height:12px;
+  background:rgba(255,255,255,.05);border-radius:6px;
+  border:1px solid rgba(255,255,255,.07);overflow:hidden;
+}
+/* 中心線（零點） */
+.eng-lever-track::after{
+  content:'';position:absolute;left:50%;top:0;bottom:0;
+  width:1px;background:rgba(255,255,255,.18);transform:translateX(-50%);
+}
+.eng-lever-fill{
+  position:absolute;top:0;bottom:0;
+  border-radius:6px;transition:left .15s ease-out,width .15s ease-out,background .15s ease-out;
+}
+.eng-lever-val{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  color:#eef2f7;text-align:center;margin-top:4px;
+}
+
+/* ── 舵角儀表面板（中央）────────────────────────────────────────────────── */
+.rudder-panel{
+  background:rgba(8,14,24,.82);border:1px solid rgba(255,255,255,.1);
+  border-radius:6px;padding:10px 14px;width:168px;backdrop-filter:blur(8px);
+  display:flex;flex-direction:column;align-items:center;
+  min-height:170px;
+}
+.rudder-panel-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2.5px;
+  color:rgba(255,255,255,.28);margin-bottom:4px;
+}
+/* 舵角 SVG（數值顯示在弧上方，指針不蓋住數字） */
+.rudder-gauge{display:block;margin:0 auto}
+.rudder-arc-bg{fill:none;stroke:rgba(255,255,255,.07);stroke-width:6;stroke-linecap:round}
+.rudder-arc-l{fill:none;stroke:#40c4ff;stroke-width:6;stroke-linecap:round;transition:stroke-dasharray .15s ease-out}
+.rudder-arc-r{fill:none;stroke:#ff7043;stroke-width:6;stroke-linecap:round;transition:stroke-dasharray .15s ease-out}
+.rudder-arc-cmd{fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dasharray .15s ease-out}
+/* 指針：ACT 實線 */
+.rudder-pointer{stroke:rgba(238,242,247,.9);stroke-width:2.5;stroke-linecap:round;transition:transform .15s ease-out}
+/* 指針：CMD 虛線 */
+.rudder-pointer-cmd{filter:drop-shadow(0 0 3px rgba(240,165,0,.3));transition:transform .15s ease-out}
+.rudder-ctr{fill:#f0a500}
+.rudder-tick{stroke:rgba(255,255,255,.22);stroke-width:1.2;stroke-linecap:round}
+.rudder-tick-minor{stroke:rgba(255,255,255,.12);stroke-width:0.8;stroke-linecap:round}
+/* 雙數值顯示（CMD + ACT） */
+.rudder-dual-vals{
+  display:flex;align-items:baseline;justify-content:center;gap:3px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;margin-bottom:3px;
+  height:22px;line-height:22px;width:100%;
+}
+.rudder-cmd-val{color:rgba(240,165,0,.8);white-space:nowrap}
+.rudder-cmd-val span{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:#f0a500;min-width:0}
+.rudder-act-val{color:rgba(238,242,247,.6);white-space:nowrap}
+.rudder-act-val span{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:#eef2f7;min-width:0}
+.rudder-dual-sep{color:rgba(255,255,255,.12);font-size:10px;margin:0 1px}
+/* 舵角數值（單一模式用，隱藏） */
+.rudder-val-display{
+  font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;
+  color:#eef2f7;text-align:center;line-height:1;margin-bottom:3px;
+  text-shadow:0 0 10px rgba(238,242,247,.3);
+}
+.rudder-side-row{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:3px}
+.rudder-side-lbl{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1px;color:rgba(255,255,255,.22)}
+.rudder-side-lbl.p{color:#40c4ff}.rudder-side-lbl.s{color:#ff7043}
+/* 底部圖例 */
+.rudder-legend{display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:1px;color:rgba(255,255,255,.35)}
+.rudder-legend-item{display:flex;align-items:center;gap:3px}
+.rudder-legend-dot{width:8px;height:3px;border-radius:1px}
+.rudder-legend-dot.cmd{background:repeating-linear-gradient(90deg,#f0a500 0px,#f0a500 3px,transparent 3px,transparent 5px)}
+.rudder-legend-dot.act{background:#eef2f7}
+
+/* ── 頂部右：自動駕駛 + LED ─────────────────────────────────────────────── */
+.tele-status{
+  position:absolute;top:10px;right:14px;
+  display:flex;align-items:center;gap:8px;
+  background:rgba(8,14,24,.78);border:1px solid rgba(255,255,255,.08);
+  border-radius:4px;padding:5px 10px;backdrop-filter:blur(6px);
+}
+.tele-led{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:all .4s}
+.tele-led.on{background:#00e676;box-shadow:0 0 7px #00e676}
+.tele-led.off{background:#3d5470}
+.tele-led.warn{background:#f0a500;box-shadow:0 0 7px #f0a500;animation:blink 1s ease-in-out infinite}
+.tele-status-txt{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;color:rgba(255,255,255,.4)}
+.tele-ap-badge{
+  padding:2px 7px;border-radius:2px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1px;
+  border:1px solid rgba(64,196,255,.25);background:rgba(64,196,255,.08);color:#40c4ff;
+  transition:all .3s;
+}
+.tele-ap-badge.active{border-color:rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:#00e676}
+
+/* ── 連線狀態點（右下角） ────────────────────────────────────────────────── */
+.tele-conn{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.25)}
+#tele-dot{width:6px;height:6px;border-radius:50%;background:var(--red);transition:background .4s,box-shadow .4s;flex-shrink:0}
+
+/* ── 小地圖 ────────────────────────────────────────────────────────────────── */
+#minimap-wrap{
+  position:absolute;top:12px;left:14px;z-index:8;
+  width:290px;height:176px;
+  border-radius:6px;overflow:hidden;
+  border:1px solid rgba(240,165,0,.3);
+  box-shadow:0 0 0 1px rgba(240,165,0,.08),0 4px 20px rgba(0,0,0,.7);
+  background:var(--deep);
+  pointer-events:all;
+  transition:border-color .2s;
+  display:flex;flex-direction:column;
+  user-select:none;
+  min-width:200px;min-height:140px;
+}
+#minimap-wrap:active{cursor:grabbing}
+#minimap-wrap:hover{border-color:rgba(240,165,0,.5)}
+#minimap-wrap.hidden{display:none}
+#minimap{width:100%;flex:1;min-height:80px}
+/* 座標欄（地圖底部整合）*/
+#map-coord-bar{
+  background:rgba(5,8,13,.92);
+  border-top:1px solid rgba(240,165,0,.18);
+  padding:4px 8px 5px;
+  display:flex;flex-direction:column;gap:0;
+  flex-shrink:0;
+  cursor:grab;
+}
+/* 統一列 & 區段 */
+.cb-section{ padding:2px 0; }
+.cb-section + .cb-section{ border-top:1px solid rgba(255,255,255,.06); }
+.cb-row{
+  display:flex;align-items:center;gap:5px;
+  min-height:16px;
+}
+.cb-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:1.5px;
+  width:22px;flex-shrink:0;
+  text-transform:uppercase;
+}
+.cb-val{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;
+  letter-spacing:.4px;
+}
+.cb-dot{
+  width:5px;height:5px;border-radius:50%;flex-shrink:0;
+}
+/* 顏色主題 */
+.cb-lbl.amber{ color:rgba(255,255,255,.3); }
+.cb-val.amber{ color:rgba(240,165,0,.9); font-size:10.5px; }
+.cb-lbl.blue{ color:rgba(66,133,244,.5); }
+.cb-val.blue-dim{ color:rgba(66,133,244,.6); font-size:9px; font-weight:400; }
+.cb-dot.blue{ background:#4285f4;box-shadow:0 0 4px rgba(66,133,244,.6); }
+.cb-lbl.red{ color:rgba(255,61,87,.5); }
+.cb-val.red-dim{ color:rgba(255,61,87,.55); font-size:9px; font-weight:400; }
+.cb-dot.red{ background:#ff3d57;box-shadow:0 0 4px rgba(255,61,87,.6); }
+.cb-val.dim{ color:rgba(255,255,255,.5); }
+/* GPS 行內距離 */
+.cb-gps-dist{
+  margin-left:auto;
+  font-size:9px;font-weight:400;
+  color:rgba(66,133,244,.55);
+  white-space:nowrap;
+}
+/* PIN 行內距離 */
+.cb-pin-dist{
+  margin-left:auto;
+  font-size:9px;font-weight:400;
+  color:rgba(255,61,87,.45);
+  white-space:nowrap;
+}
+/* 圖釘按鈕 */
+.cb-btn{
+  width:18px;height:18px;
+  background:rgba(255,61,87,.08);
+  border:1px solid rgba(255,61,87,.25);
+  border-radius:3px;
+  color:rgba(255,61,87,.6);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  padding:0;transition:all .15s;
+  pointer-events:all;flex-shrink:0;
+}
+.cb-btn:hover{ background:rgba(255,61,87,.18);border-color:rgba(255,61,87,.5);color:#ff3d57; }
+.cb-btn.active{
+  background:rgba(255,61,87,.25);border-color:#ff3d57;color:#ff3d57;
+  box-shadow:0 0 6px rgba(255,61,87,.4);
+  animation:blink 1s ease-in-out infinite;
+}
+.cb-btn svg{ display:block; }
+/* 圖釘資訊（座標 + 移除鈕） */
+.cb-pin-info{
+  display:inline-flex;align-items:center;gap:4px;
+}
+.cb-btn-xs{
+  width:14px;height:14px;margin-left:2px;
+  background:rgba(255,61,87,.08);
+  border:1px solid rgba(255,61,87,.2);
+  border-radius:2px;
+  font-size:8px;line-height:1;color:rgba(255,61,87,.5);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  padding:0;transition:all .15s;pointer-events:all;flex-shrink:0;
+}
+.cb-btn-xs:hover{ background:rgba(255,61,87,.2);border-color:#ff3d57;color:#ff3d57; }
+/* Leaflet 覆蓋樣式 */
+#minimap-wrap .leaflet-control-attribution{display:none}
+#minimap-wrap .leaflet-control-zoom{display:none}
+/* 船隻標記 */
+.vessel-icon{background:transparent;border:none}
+.vessel-dot{
+  width:14px;height:14px;
+  background:#f0a500;border-radius:50%;
+  border:2px solid rgba(240,165,0,.5);
+  box-shadow:0 0 10px rgba(240,165,0,.8),0 0 20px rgba(240,165,0,.4);
+  animation:blink 2s ease-in-out infinite;
+}
+/* 使用者位置標記（藍色） */
+.my-loc-icon{background:transparent;border:none}
+.my-loc-dot{
+  width:12px;height:12px;
+  background:#4285f4;border-radius:50%;
+  border:2.5px solid #fff;
+  box-shadow:0 0 8px rgba(66,133,244,.9),0 0 16px rgba(66,133,244,.45);
+}
+.my-loc-ring{
+  position:absolute;top:50%;left:50%;
+  width:28px;height:28px;margin:-14px 0 0 -14px;
+  border-radius:50%;
+  background:rgba(66,133,244,.18);
+  border:1px solid rgba(66,133,244,.35);
+  animation:my-loc-pulse 2s ease-out infinite;
+  pointer-events:none;
+}
+@keyframes my-loc-pulse{
+  0%  {transform:scale(.6);opacity:1}
+  100%{transform:scale(1.8);opacity:0}
+}
+/* 測量圖釘 marker */
+.pin-icon{background:transparent;border:none}
+.pin-dot{
+  width:14px;height:14px;
+  background:#ff3d57;border-radius:50%;
+  border:2px solid rgba(255,61,87,.5);
+  box-shadow:0 0 8px rgba(255,61,87,.8),0 0 16px rgba(255,61,87,.35);
+}
+/* 小地圖開關按鈕 */
+#minimap-toggle{
+  position:absolute;right:4px;top:4px;z-index:9;
+  width:22px;height:22px;
+  background:rgba(8,14,24,.8);
+  border:1px solid rgba(240,165,0,.25);
+  border-radius:3px;color:rgba(240,165,0,.6);
+  font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;pointer-events:all;
+}
+#minimap-toggle:hover{border-color:var(--amber);color:var(--amber)}
+/* 小地圖縮放把手 */
+#minimap-rsz{
+  position:absolute;bottom:0;right:0;width:18px;height:18px;
+  cursor:nwse-resize;z-index:10;
+  display:flex;align-items:flex-end;justify-content:flex-end;padding:3px;
+  pointer-events:all;
+}
+#minimap-rsz svg{width:10px;height:10px;opacity:.6}
+#minimap-rsz:hover svg{opacity:1}
+/* ROLL / PITCH 人工水平儀 (AHI) */
+.ahi-panel{
+  position:absolute;bottom:14px;left:14px;z-index:8;
+  background:rgba(8,14,24,.88);
+  border:1px solid rgba(240,165,0,.18);
+  border-radius:8px;padding:6px 10px 8px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  pointer-events:none;
+  width:140px;
+}
+.ahi-title{
+  font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:3px;
+  color:rgba(255,255,255,.28);
+}
+.ahi-globe-wrap{width:120px;height:120px;position:relative}
+.ahi-svg{width:100%;height:100%;overflow:visible}
+#ahi-horizon{transition:transform .15s ease-out}
+#ahi-roll-ptr{transform-origin:60px 60px;transition:transform .15s ease-out}
+.ahi-vals{
+  display:flex;width:100%;justify-content:space-around;gap:2px;
+}
+.ahi-val-item{
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+}
+.ahi-val-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:2px;
+  color:rgba(255,255,255,.28);
+}
+.ahi-val-num{
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;
+  color:#eef2f7;line-height:1;
+}

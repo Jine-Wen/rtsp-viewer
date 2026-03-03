@@ -1,0 +1,63 @@
+INFO:__main__:Loaded 13 streams
+INFO:__main__:StreamManager initialized
+/home/jetseaai/rtsp-viewer/backend/main.py:253: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+INFO:     Started server process [43093]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54360 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54360 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43688 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54360 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43692 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54360 - "GET /?id=7033d119-3a70-42ca-a24f-5dd56b4b4fa6&vscodeBrowserReqId=1771746917715 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54360 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54358 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39914 - "GET /api/streams HTTP/1.1" 200 OK

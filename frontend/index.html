@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JetseaAI — 船隊監控系統</title>
+<!-- 外部套件 -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- 應用樣式 -->
+<link rel="stylesheet" href="/static/css/main.css">
+<link rel="stylesheet" href="/static/css/telemetry.css">
+</head>
+<body>
+<div id="apierr"></div>
+<div id="app">
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+<header id="hdr">
+  <div class="logo-wrap">
+    <div class="compass"><svg viewBox="0 0 34 34" fill="none"><circle cx="17" cy="17" r="16" stroke="rgba(240,165,0,.22)" stroke-width="1"></circle><circle cx="17" cy="17" r="12" stroke="rgba(240,165,0,.1)" stroke-width=".8"></circle><circle cx="17" cy="17" r="2.5" fill="#f0a500"></circle><polygon points="17,3 19,15 17,13 15,15" fill="#f0a500"></polygon><polygon points="17,31 15,19 17,21 19,19" fill="rgba(240,165,0,.4)"></polygon><polygon points="31,17 19,15 21,17 19,19" fill="rgba(240,165,0,.4)"></polygon><polygon points="3,17 15,19 13,17 15,15" fill="rgba(240,165,0,.4)"></polygon><text x="17" y="10.5" text-anchor="middle" fill="#f0a500" font-size="5" font-family="sans-serif" font-weight="700">N</text></svg></div>
+    <div><div class="brand-main">JetseaAI</div><div class="brand-sub">FLEET MONITOR · v2.0</div></div>
+  </div>
+  <div class="hd-sep"></div>
+  <div class="fleet-pills" id="fleet-pills"></div>
+  <div class="hdr-right">
+    <div class="hstat">LIVE <span class="lv" id="h-live">0</span></div>
+    <div class="hstat">· CAM <strong id="h-total">13</strong></div>
+    <div class="hd-sep"></div>
+    <button class="hbtn go" onclick="app.startV()">▶ 全艦啟動</button>
+    <button class="hbtn stp" onclick="app.stopV()">■ 全艦停止</button>
+    <div class="hd-sep"></div>
+    <div class="clk"><div class="clk-t" id="clk"></div><div class="clk-d" id="clkd"></div></div>
+  </div>
+</header>
+
+<!-- ══ SIDEBAR ═════════════════════════════════════════════════════════════ -->
+<aside id="sb">
+  <div class="sb-collapse-strip" style="display:none;flex-direction:column;align-items:center;gap:10px;padding:12px 0;height:100%;overflow-y:auto">
+    <div style="font-size:18px;cursor:pointer;opacity:.6" id="sb-c-icon" title="展開側欄">🚢</div>
+  </div>
+  <div class="sb-vh">
+    <div class="sb-vn"><span id="sb-ic">🚢</span><span id="sb-nm"></span></div>
+    <div class="sb-vm" id="sb-mt"></div>
+  </div>
+  <div id="clist"></div>
+  <button class="add-cam" onclick="app.openAdd()">+ 新增攝影機</button>
+  <div class="sb-foot">
+    <button class="sbbtn g" onclick="app.startV()">▶ 全部啟動</button>
+    <button class="sbbtn r" onclick="app.stopV()">■ 全部停止</button>
+    <button class="sbbtn" onclick="app.setView('grid')">⊞</button>
+  </div>
+</aside>
+
+<!-- ══ MAIN STAGE ═════════════════════════════════════════════════════════ -->
+<main id="main">
+  <div id="mbar">
+    <div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="mvn" id="m-vn"></span>
+        <span class="mcn" id="m-cn"></span>
+        <span class="mbadge stopped" id="m-badge">OFFLINE</span>
+      </div>
+      <div class="murl" id="m-url"></div>
+    </div>
+    <div class="bspc"></div>
+    <button class="mabtn go" onclick="app.startMain()">▶ 啟動</button>
+    <button class="mabtn stp" onclick="app.stopMain()">■ 停止</button>
+    <div style="width:1px;height:20px;background:var(--b-hull);margin:0 3px"></div>
+    <div class="vmodes">
+      <button class="vmbtn active" data-vm="overview" onclick="app.setView('overview')"><svg viewBox="0 0 12 12" fill="currentColor"><rect x="0" y="0" width="12" height="7" rx="1"></rect><rect x="7" y="8.5" width="5" height="3.5" rx="0.5"></rect></svg>主畫面</button>
+      <button class="vmbtn" data-vm="single" onclick="app.setView('single')"><svg viewBox="0 0 12 12" fill="currentColor"><rect x="0" y="0" width="12" height="12" rx="1"></rect></svg>單一</button>
+      <button class="vmbtn" data-vm="grid" onclick="app.setView('grid')"><svg viewBox="0 0 12 12" fill="currentColor"><rect x="0" y="0" width="5" height="5"></rect><rect x="7" y="0" width="5" height="5"></rect><rect x="0" y="7" width="5" height="5"></rect><rect x="7" y="7" width="5" height="5"></rect></svg>分割</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <!-- 主畫面影像 -->
+    <div id="mvwrap"><video id="mvideo" muted autoplay playsinline></video><div class="scanlines"></div><div class="vignette"></div></div>
+    <div class="hud-tl" style="top:182px"><div class="hud-vn" id="hud-vn"></div><div class="hud-cn" id="hud-cn"></div></div>
+    <div class="hud-bl"><div class="hud-rec" id="hud-rec"><div class="hud-rd"></div>LIVE</div></div>
+    <div class="hud-br" id="hud-br"><div class="tele-conn"><div id="tele-dot"></div><span id="tele-conn-txt">TELEMETRY</span></div></div>
+
+    <!-- ── 小地圖 ─────────────────────────────────────────────── -->
+    <div id="minimap-wrap">
+      <div id="minimap"></div>
+      <div id="map-coord-bar">
+        <!-- 船隻座標 -->
+        <div class="cb-section cb-vessel">
+          <div class="cb-row">
+            <span class="cb-lbl amber">LAT</span>
+            <span class="cb-val amber" id="tele-lat">--.------°</span>
+          </div>
+          <div class="cb-row">
+            <span class="cb-lbl amber">LON</span>
+            <span class="cb-val amber" id="tele-lon">----.------°</span>
+          </div>
+        </div>
+        <!-- GPS 我的位置 + 距離同行 -->
+        <div class="cb-section cb-myloc">
+          <div class="cb-row">
+            <span class="cb-dot blue"></span>
+            <span class="cb-lbl blue">GPS</span>
+            <span class="cb-val blue-dim" id="my-loc-lat">--°</span>
+            <span class="cb-val blue-dim" id="my-loc-lon">--°</span>
+            <span class="cb-val dim cb-gps-dist" id="gps-dist-row" style="display:none">
+              <span id="gps-dist-val">--</span>
+            </span>
+          </div>
+        </div>
+        <!-- 圖釘工具 + 座標 + 距離同行 -->
+        <div class="cb-section cb-pin">
+          <div class="cb-row">
+            <button id="my-loc-btn" class="cb-btn" title="在地圖上放置測量圖釘">
+              <svg viewBox="0 0 16 16" width="10" height="10"><path d="M8 1C5.8 1 4 2.7 4 5c0 3.5 4 9 4 9s4-5.5 4-9c0-2.3-1.8-4-4-4zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>
+            </button>
+            <span id="map-pin-info" class="cb-pin-info" style="display:none">
+              <span class="cb-dot red"></span>
+              <span class="cb-lbl red">PIN</span>
+              <span class="cb-val red-dim" id="pin-lat">--°</span>
+              <span class="cb-val red-dim" id="pin-lon">--°</span>
+              <span class="cb-val dim cb-pin-dist" id="pin-dist-wrap" style="display:none">
+                <span id="pin-dist-val">--</span>
+              </span>
+              <button id="pin-remove-btn" class="cb-btn-xs" title="移除圖釘">✕</button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <button id="minimap-toggle" title="隱藏地圖">✕</button>
+      <div id="minimap-rsz"><svg viewBox="0 0 10 10" fill="rgba(240,165,0,.45)"><rect x="5" y="0" width="5" height="1.5" rx=".5"/><rect x="0" y="5" width="1.5" height="5" rx=".5"/><rect x="5" y="3" width="5" height="1.5" rx=".5"/><rect x="3" y="5" width="1.5" height="5" rx=".5"/><rect x="5" y="5" width="5" height="5" rx=".5"/></svg></div>
+    </div>
+
+    <!-- ── 遙測 HUD ───────────────────────────────────────────── -->
+    <div class="tele-hud" id="tele-hud" style="display:none">
+
+      <!-- ① 頂部：大羅盤 -->
+      <div class="tele-top-row">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+          <div class="hdg-compass-wrap">
+            <svg viewBox="0 0 148 148">
+              <circle cx="74" cy="74" r="70" stroke="rgba(240,165,0,.12)" stroke-width="1" fill="none"/>
+              <circle cx="74" cy="74" r="63" stroke="rgba(255,255,255,.07)" stroke-width="0.8" fill="none"/>
+              <circle cx="74" cy="74" r="60" fill="rgba(5,8,13,.72)"/>
+              <g stroke="rgba(255,255,255,.18)" stroke-width="0.8">
+                <line x1="74" y1="12" x2="74" y2="18"/>
+                <line x1="74" y1="130" x2="74" y2="136"/>
+                <line x1="12" y1="74" x2="18" y2="74"/>
+                <line x1="130" y1="74" x2="136" y2="74"/>
+                <line x1="118.1" y1="29.9" x2="113.8" y2="34.2"/>
+                <line x1="29.9" y1="118.1" x2="34.2" y2="113.8"/>
+                <line x1="29.9" y1="29.9" x2="34.2" y2="34.2"/>
+                <line x1="118.1" y1="118.1" x2="113.8" y2="113.8"/>
+              </g>
+              <text x="74" y="25" text-anchor="middle" fill="#f0a500" font-size="10" font-family="'Barlow Condensed',sans-serif" font-weight="700" letter-spacing="1">N</text>
+              <text x="126" y="78" text-anchor="middle" fill="rgba(255,255,255,.45)" font-size="9" font-family="'Barlow Condensed',sans-serif" font-weight="600">E</text>
+              <text x="74" y="133" text-anchor="middle" fill="rgba(255,255,255,.45)" font-size="9" font-family="'Barlow Condensed',sans-serif" font-weight="600">S</text>
+              <text x="22" y="78" text-anchor="middle" fill="rgba(255,255,255,.45)" font-size="9" font-family="'Barlow Condensed',sans-serif" font-weight="600">W</text>
+              <text x="116" y="36" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="7" font-family="monospace">NE</text>
+              <text x="116" y="116" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="7" font-family="monospace">SE</text>
+              <text x="32" y="116" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="7" font-family="monospace">SW</text>
+              <text x="32" y="36" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="7" font-family="monospace">NW</text>
+              <!-- COG 指向箭頭（藍色，在羅盤針下面） -->
+              <g id="cog-needle" style="transform:rotate(0deg)">
+                <line x1="74" y1="20" x2="74" y2="44" stroke="#40c4ff" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+                <polygon points="74,16 77.5,26 74,22 70.5,26" fill="#40c4ff" opacity="0.8"/>
+              </g>
+              <g id="compass-needle" style="transform:rotate(0deg)">
+                <polygon points="74,18 77,68 74,62 71,68" fill="#f0a500" opacity="0.95"/>
+                <polygon points="74,130 77,80 74,86 71,80" fill="rgba(255,255,255,.18)"/>
+              </g>
+              <circle cx="74" cy="74" r="5" fill="rgba(8,14,24,1)" stroke="#f0a500" stroke-width="1.5"/>
+              <circle cx="74" cy="74" r="2.5" fill="#f0a500"/>
+            </svg>
+            <div class="hdg-center">
+              <div class="hdg-num" id="tele-hdg">---°</div>
+              <div class="hdg-lbl">HEADING</div>
+              <div class="cog-inline"><span class="cog-inline-dot"></span>COG <span class="cog-inline-val" id="tele-cog">---°</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 姿態指示器 ROLL / PITCH (合併式人工水平儀) -->
+      <div class="ahi-panel">
+        <div class="ahi-title">ATTITUDE</div>
+        <div class="ahi-globe-wrap">
+          <svg viewBox="0 0 120 120" class="ahi-svg">
+            <defs>
+              <clipPath id="ahi-clip"><circle cx="60" cy="60" r="54"/></clipPath>
+              <linearGradient id="ahi-sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1a5276"/>
+                <stop offset="100%" stop-color="#2e86c1"/>
+              </linearGradient>
+              <linearGradient id="ahi-gnd" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#784212"/>
+                <stop offset="100%" stop-color="#5b3a1a"/>
+              </linearGradient>
+            </defs>
+            <!-- 外環 -->
+            <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+            <!-- 天地背景（受 pitch 平移、受 roll 旋轉） -->
+            <g id="ahi-horizon" clip-path="url(#ahi-clip)">
+              <rect x="-60" y="-120" width="240" height="180" fill="url(#ahi-sky)"/>
+              <rect x="-60" y="60" width="240" height="180" fill="url(#ahi-gnd)"/>
+              <line x1="-60" y1="60" x2="180" y2="60" stroke="rgba(255,255,255,.7)" stroke-width="1.2"/>
+              <!-- pitch 刻度線 -->
+              <line x1="40" y1="42" x2="80" y2="42" stroke="rgba(255,255,255,.3)" stroke-width="0.7"/>
+              <text x="83" y="43.5" fill="rgba(255,255,255,.25)" font-size="5" font-family="monospace">10</text>
+              <line x1="45" y1="51" x2="75" y2="51" stroke="rgba(255,255,255,.2)" stroke-width="0.5"/>
+              <text x="77" y="52.5" fill="rgba(255,255,255,.18)" font-size="4.5" font-family="monospace">5</text>
+              <line x1="45" y1="69" x2="75" y2="69" stroke="rgba(255,255,255,.2)" stroke-width="0.5"/>
+              <text x="77" y="70.5" fill="rgba(255,255,255,.18)" font-size="4.5" font-family="monospace">5</text>
+              <line x1="40" y1="78" x2="80" y2="78" stroke="rgba(255,255,255,.3)" stroke-width="0.7"/>
+              <text x="83" y="79.5" fill="rgba(255,255,255,.25)" font-size="5" font-family="monospace">10</text>
+            </g>
+            <!-- roll 刻度弧（固定） -->
+            <g opacity="0.35">
+              <line x1="60" y1="8" x2="60" y2="14" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
+              <line x1="40.3" y1="11.5" x2="42.7" y2="17" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
+              <line x1="79.7" y1="11.5" x2="77.3" y2="17" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
+              <line x1="23.2" y1="23.2" x2="27.4" y2="27.4" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
+              <line x1="96.8" y1="23.2" x2="92.6" y2="27.4" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
+            </g>
+            <!-- roll 三角指標（隨 roll 轉動） -->
+            <g id="ahi-roll-ptr">
+              <polygon points="60,12 57,6 63,6" fill="#f0a500" opacity="0.9"/>
+            </g>
+            <!-- 中央固定飛機圖標 -->
+            <circle cx="60" cy="60" r="3" fill="none" stroke="#f0a500" stroke-width="1.8"/>
+            <line x1="30" y1="60" x2="52" y2="60" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+            <line x1="68" y1="60" x2="90" y2="60" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+            <line x1="56" y1="72" x2="64" y2="72" stroke="#f0a500" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="ahi-vals">
+          <div class="ahi-val-item">
+            <span class="ahi-val-lbl">ROLL</span>
+            <span class="ahi-val-num" id="tele-roll">-.-°</span>
+          </div>
+          <div class="ahi-val-item">
+            <span class="ahi-val-lbl">PITCH</span>
+            <span class="ahi-val-num" id="tele-pitch">-.-°</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② SOG + THROTTLE 同心雙弧儀表 -->
+      <div class="sog-thr-panel">
+        <div class="dual-gauge-title">
+          <div class="dual-gauge-title-item"><div class="dual-title-dot sog"></div><span class="dual-title-lbl">SOG</span></div>
+          <div class="dual-gauge-title-item"><div class="dual-title-dot thr"></div><span class="dual-title-lbl">THROTTLE</span></div>
+        </div>
+        <div class="dual-gauge-wrap">
+          <svg viewBox="0 0 186 120" overflow="visible">
+            <defs>
+              <linearGradient id="sogGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#40c4ff"/><stop offset="45%" stop-color="#00e676"/><stop offset="100%" stop-color="#ff3d57"/></linearGradient>
+              <linearGradient id="thrGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#40c4ff"/><stop offset="55%" stop-color="#00e676"/><stop offset="100%" stop-color="#f0a500"/></linearGradient>
+              <filter id="sogGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <filter id="thrGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <filter id="needleGlow" x="-60%" y="-20%" width="220%" height="140%"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <path d="M 14.2 113.9 A 80 80 0 1 1 171.8 113.9" fill="none" stroke="rgba(240,165,0,.04)" stroke-width="18" stroke-linecap="round"/>
+            <path d="M 14.2 113.9 A 80 80 0 1 1 171.8 113.9" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="8" stroke-linecap="round"/>
+            <text x="6" y="107" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="7.5" font-family="monospace">0</text>
+            <text x="26" y="52" text-anchor="middle" fill="rgba(255,255,255,.20)" font-size="7.5" font-family="monospace">10</text>
+            <text x="93" y="16" text-anchor="middle" fill="rgba(255,255,255,.25)" font-size="7.5" font-family="monospace">25</text>
+            <text x="160" y="52" text-anchor="middle" fill="rgba(255,255,255,.20)" font-size="7.5" font-family="monospace">40</text>
+            <text x="180" y="107" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="7.5" font-family="monospace">55</text>
+            <path id="sog-arc" d="M 14.2 113.9 A 80 80 0 1 1 171.8 113.9" fill="none" stroke="url(#sogGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 600" filter="url(#sogGlow)"/>
+            <path d="M 33.9 110.4 A 60 60 0 1 1 152.1 110.4" fill="none" stroke="rgba(0,230,118,.04)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 33.9 110.4 A 60 60 0 1 1 152.1 110.4" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="6" stroke-linecap="round"/>
+            <text x="36" y="107" text-anchor="middle" fill="rgba(255,255,255,.18)" font-size="7" font-family="monospace">0</text>
+            <text x="50" y="61" text-anchor="middle" fill="rgba(255,255,255,.17)" font-size="7" font-family="monospace">25</text>
+            <text x="93" y="36" text-anchor="middle" fill="rgba(255,255,255,.20)" font-size="7" font-family="monospace">50</text>
+            <text x="136" y="61" text-anchor="middle" fill="rgba(255,255,255,.17)" font-size="7" font-family="monospace">75</text>
+            <text x="150" y="107" text-anchor="middle" fill="rgba(255,255,255,.18)" font-size="7" font-family="monospace">100</text>
+            <path id="thr-arc" d="M 33.9 110.4 A 60 60 0 1 1 152.1 110.4" fill="none" stroke="url(#thrGrad)" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 600" filter="url(#thrGlow)"/>
+            <line id="sog-needle-glow" x1="93" y1="100" x2="93" y2="28" stroke="rgba(240,165,0,.18)" stroke-width="5" stroke-linecap="round" style="transform:rotate(-100deg);transform-origin:93px 100px;transition:transform .15s ease-out" filter="url(#needleGlow)"/>
+            <line id="sog-needle" x1="93" y1="100" x2="93" y2="26" stroke="#f0a500" stroke-width="2" stroke-linecap="round" style="transform:rotate(-100deg);transform-origin:93px 100px;transition:transform .15s ease-out"/>
+            <line id="thr-needle-glow" x1="93" y1="100" x2="93" y2="44" stroke="rgba(0,230,118,.18)" stroke-width="5" stroke-linecap="round" style="transform:rotate(-100deg);transform-origin:93px 100px;transition:transform .15s ease-out" filter="url(#needleGlow)"/>
+            <line id="thr-needle" x1="93" y1="100" x2="93" y2="42" stroke="#00e676" stroke-width="2" stroke-linecap="round" style="transform:rotate(-100deg);transform-origin:93px 100px;transition:transform .15s ease-out"/>
+            <circle cx="93" cy="100" r="7" fill="rgba(6,11,20,1)" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+            <circle cx="93" cy="100" r="3.5" fill="rgba(255,255,255,.6)"/>
+          </svg>
+        </div>
+        <div class="dual-gauge-vals">
+          <div class="dual-val-block"><span class="dual-val-lbl">⚓ SOG</span><span class="dual-val-num sog" id="tele-sog">-.--</span><span class="dual-val-unit">KN</span></div>
+          <div class="dual-vals-sep"></div>
+          <div class="dual-val-block"><span class="dual-val-lbl">⚙ THR</span><span class="dual-val-num thr" id="tele-throttle">0%</span><span class="dual-val-unit">THROTTLE</span></div>
+        </div>
+      </div>
+
+      <!-- ④ 自動駕駛 + LED -->
+      <div class="tele-status" style="right:300px">
+        <div class="tele-led off" id="tele-neutral-led" title="Neutral"></div>
+        <div class="tele-led off" id="tele-active-led" title="Active"></div>
+        <span class="tele-status-txt" id="tele-ctrl-status">---</span>
+        <div class="tele-ap-badge" id="tele-ap-badge">MANUAL</div>
+      </div>
+
+      <!-- ⑤ 底部橫條：PORT · RUDDER · STBD -->
+      <div class="tele-bottom-bar">
+        <div class="eng-panel">
+          <div class="eng-header"><span class="eng-name">PORT</span><span class="gear-badge N" id="tele-lgear">N</span></div>
+          <div class="eng-rpm-val" id="tele-lrpm">0</div>
+          <div class="eng-rpm-unit">RPM</div>
+          <div class="eng-bar-wrap"><div class="eng-bar L" id="rpm-bar-l"></div></div>
+          <div class="eng-lever-label"><span>REV</span><span>LEVER</span><span>FWD</span></div>
+          <div class="eng-lever-track" id="lever-track-l"><div class="eng-lever-fill" id="lever-fill-l"></div></div>
+          <div class="eng-lever-val" id="lever-val-l">0</div>
+        </div>
+        <div class="rudder-panel">
+          <div class="rudder-panel-lbl">RUDDER</div>
+          <div class="rudder-dual-vals">
+            <span class="rudder-cmd-val" title="指令舵角">CMD <span id="rudder-cmd-num">+0.0°</span></span>
+            <span class="rudder-dual-sep">│</span>
+            <span class="rudder-act-val" title="實際舵角">ACT <span id="rudder-act-num">+0.0°</span></span>
+          </div>
+          <svg class="rudder-gauge" width="158" height="90" viewBox="0 0 158 90">
+            <!-- 主刻度線 (每10°) -->
+            <!-- 0 (頂部中央) -->
+            <line class="rudder-tick" x1="79" y1="27" x2="79" y2="32"/>
+            <!-- ±10 -->
+            <line class="rudder-tick" x1="58.2" y1="31.8" x2="60.4" y2="36.3"/>
+            <line class="rudder-tick" x1="99.8" y1="31.8" x2="97.6" y2="36.3"/>
+            <!-- ±20 -->
+            <line class="rudder-tick" x1="41.7" y1="45.4" x2="45.7" y2="48.4"/>
+            <line class="rudder-tick" x1="116.3" y1="45.4" x2="112.3" y2="48.4"/>
+            <!-- ±30 -->
+            <line class="rudder-tick" x1="32.9" y1="64.8" x2="37.8" y2="65.8"/>
+            <line class="rudder-tick" x1="125.1" y1="64.8" x2="120.2" y2="65.8"/>
+            <!-- ±40 (底部兩端) -->
+            <line class="rudder-tick" x1="33.6" y1="86.2" x2="38.4" y2="84.9"/>
+            <line class="rudder-tick" x1="124.4" y1="86.2" x2="119.6" y2="84.9"/>
+            <!-- 次刻度線 (每5°, 非主刻度) -->
+            <line class="rudder-tick-minor" x1="68.3" y1="28.2" x2="69.0" y2="31.1"/>
+            <line class="rudder-tick-minor" x1="89.7" y1="28.2" x2="89.0" y2="31.1"/>
+            <line class="rudder-tick-minor" x1="49.2" y1="37.7" x2="51.1" y2="40.0"/>
+            <line class="rudder-tick-minor" x1="108.8" y1="37.7" x2="106.9" y2="40.0"/>
+            <line class="rudder-tick-minor" x1="36.2" y1="54.6" x2="38.9" y2="55.8"/>
+            <line class="rudder-tick-minor" x1="121.8" y1="54.6" x2="119.1" y2="55.8"/>
+            <line class="rudder-tick-minor" x1="32.0" y1="75.5" x2="35.0" y2="75.4"/>
+            <line class="rudder-tick-minor" x1="126.0" y1="75.5" x2="123.0" y2="75.4"/>
+            <!-- 刻度標籤 -->
+            <text x="79" y="16" text-anchor="middle" fill="rgba(255,255,255,.3)" font-size="7" font-family="monospace">0</text>
+            <text x="54.2" y="24.5" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="6.5" font-family="monospace">10</text>
+            <text x="103.8" y="24.5" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="6.5" font-family="monospace">10</text>
+            <text x="34.6" y="39.5" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="6.5" font-family="monospace">20</text>
+            <text x="123.4" y="39.5" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="6.5" font-family="monospace">20</text>
+            <text x="23" y="65" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="6.5" font-family="monospace">30</text>
+            <text x="135" y="65" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="6.5" font-family="monospace">30</text>
+            <text x="22" y="89" text-anchor="middle" fill="rgba(255,255,255,.25)" font-size="7" font-family="monospace">40</text>
+            <text x="136" y="89" text-anchor="middle" fill="rgba(255,255,255,.25)" font-size="7" font-family="monospace">40</text>
+            <!-- 背景弧 -->
+            <path class="rudder-arc-bg" d="M 33.6 86.2 A 47 47 0 1 1 124.4 86.2" stroke-dasharray="172.0 500"/>
+            <!-- CMD 弧（黃色半透明） -->
+            <path class="rudder-arc-cmd" id="rudder-arc-cmd-l" d="M 33.6 86.2 A 47 47 0 1 1 124.4 86.2"
+                  fill="none" stroke="rgba(240,165,0,.45)" stroke-width="3" stroke-linecap="round"
+                  stroke-dasharray="0 500"/>
+            <path class="rudder-arc-cmd" id="rudder-arc-cmd-r" d="M 33.6 86.2 A 47 47 0 1 1 124.4 86.2"
+                  fill="none" stroke="rgba(240,165,0,.45)" stroke-width="3" stroke-linecap="round"
+                  stroke-dasharray="0 500"/>
+            <!-- ACT 弧（青色/橙色實線） -->
+            <path class="rudder-arc-l" id="rudder-arc-l" d="M 33.6 86.2 A 47 47 0 1 1 124.4 86.2" stroke-dasharray="0 500"/>
+            <path class="rudder-arc-r" id="rudder-arc-r" d="M 33.6 86.2 A 47 47 0 1 1 124.4 86.2" stroke-dasharray="0 500"/>
+            <!-- CMD 指針（黃色虛線） -->
+            <line class="rudder-pointer-cmd" id="rudder-needle-cmd"
+                  x1="79" y1="74" x2="79" y2="36"
+                  stroke="rgba(240,165,0,.55)" stroke-width="1.8" stroke-dasharray="4 3" stroke-linecap="round"
+                  style="transform:rotate(0deg);transform-origin:79px 74px;transition:transform .15s ease-out"/>
+            <!-- ACT 指針（白色實線） -->
+            <line class="rudder-pointer" id="rudder-needle" x1="79" y1="74" x2="79" y2="32" style="transform:rotate(0deg);transform-origin:79px 74px"/>
+            <!-- 中心點 -->
+            <circle class="rudder-ctr" cx="79" cy="74" r="5"/>
+            <circle cx="79" cy="74" r="2.2" fill="rgba(8,14,24,1)"/>
+          </svg>
+          <div class="rudder-side-row">
+            <span class="rudder-side-lbl p">◀ PORT</span>
+            <div class="rudder-legend">
+              <span class="rudder-legend-item"><span class="rudder-legend-dot cmd"></span>CMD</span>
+              <span class="rudder-legend-item"><span class="rudder-legend-dot act"></span>ACT</span>
+            </div>
+            <span class="rudder-side-lbl s">STBD ▶</span>
+          </div>
+        </div>
+        <div class="eng-panel">
+          <div class="eng-header"><span class="eng-name">STBD</span><span class="gear-badge N" id="tele-rgear">N</span></div>
+          <div class="eng-rpm-val" id="tele-rrpm">0</div>
+          <div class="eng-rpm-unit">RPM</div>
+          <div class="eng-bar-wrap"><div class="eng-bar R" id="rpm-bar-r"></div></div>
+          <div class="eng-lever-label"><span>REV</span><span>LEVER</span><span>FWD</span></div>
+          <div class="eng-lever-track" id="lever-track-r"><div class="eng-lever-fill" id="lever-fill-r"></div></div>
+          <div class="eng-lever-val" id="lever-val-r">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="movl"><div class="ol-icon">🚢</div><div class="ol-msg">選擇攝影機</div><div class="ol-sub">從左側選擇鏡頭</div></div>
+    <div id="pip"><video id="pip-vid" muted autoplay playsinline></video><div class="pip-lbl"><span class="pip-lt">🎮 BRIDGE CAM</span><span class="pip-lv" id="pip-lv"><span class="pip-ld"></span>LIVE</span></div><div class="pip-mark" id="pip-mark"></div><div id="pip-ovl"><div class="pip-oi">🎮</div><div class="pip-om">連線中…</div></div><div id="pip-rsz"><svg viewBox="0 0 10 10" fill="rgba(255,255,255,.5)"><rect x="5" y="0" width="5" height="1.5" rx=".5"></rect><rect x="0" y="5" width="1.5" height="5" rx=".5"></rect><rect x="5" y="3" width="5" height="1.5" rx=".5"></rect><rect x="3" y="5" width="1.5" height="5" rx=".5"></rect><rect x="5" y="5" width="5" height="5" rx=".5"></rect></svg></div></div>
+    <div id="grid-view"></div>
+  </div>
+</main>
+</div>
+
+<!-- ══ MODALS ══════════════════════════════════════════════════════════════ -->
+<div class="mbg" id="modal"><div class="modal"><div class="mhd"><span class="mtitle" id="mtitle"></span><button class="mclose" onclick="app.closeModal()">✕</button></div><div class="mbody"><input type="hidden" id="eid"><div class="fr"><label class="fl">所屬船隻</label><select class="fsel" id="iv"></select></div><div class="fr"><label class="fl">攝影機名稱</label><input class="fi" id="iname" placeholder="主甲板鏡頭"></div><div class="fr"><label class="fl">串流 URL（RTSP / HTTP / RTMP）</label><input class="fi" id="iurl" placeholder="rtsp://192.168.x.x:554/stream1"></div><div class="fr" id="url-hint" style="margin-top:-8px;margin-bottom:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t-dim)">支援格式：rtsp://192.168.1.100:554/stream · rtsp://user:pass@ip/path</span></div><div class="fr"><label class="fl">攝影機角色</label><div class="rg"><div class="ro sel" data-r="main" onclick="pickR(this)">⚓ 主鏡頭</div><div class="ro" data-r="bridge" onclick="pickR(this)">🎮 駕駛艙</div><div class="ro" data-r="deck" onclick="pickR(this)">📡 甲板</div><div class="ro" data-r="engine" onclick="pickR(this)">⚙ 機艙</div></div><input type="hidden" id="irole" value="main"></div></div><div class="mfoot"><button class="bcnl" onclick="app.closeModal()">取消</button><button class="bsav" onclick="app.saveCam()">儲存</button></div></div></div>
+
+<div class="mbg" id="vmodal">
+  <div class="modal" style="width:400px">
+    <div class="mhd"><span class="mtitle" id="vmtitle"></span><button class="mclose" onclick="app.closeVModal()">✕</button></div>
+    <div class="mbody">
+      <input type="hidden" id="veid">
+      <div class="fr"><label class="fl">船隻 ID（英數字，建立後不可更改）</label><input class="fi" id="viid" placeholder="jh3" style="text-transform:lowercase"><div id="viid-hint" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t-dim);margin-top:4px">僅限英文字母與數字，例：jh3、vessel01</div></div>
+      <div class="fr"><label class="fl">船隻名稱</label><input class="fi" id="viname" placeholder="傑海三號"></div>
+      <div class="fr">
+        <label class="fl">圖示</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="vicon-preview" style="font-size:28px;line-height:1">🚢</span>
+          <div class="icon-grid">
+            <div class="icon-opt sel" onclick="pickIcon(this)" data-ic="🚢">🚢</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="⚓">⚓</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="🛥️">🛥️</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="🚤">🚤</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="⛵">⛵</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="��️">🛳️</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="🔬">🔬</div>
+            <div class="icon-opt" onclick="pickIcon(this)" data-ic="📡">📡</div>
+          </div>
+        </div>
+        <input type="hidden" id="viicon" value="🚢">
+      </div>
+      <div class="fr"><label class="fl">備註說明</label><input class="fi" id="vimeta" placeholder="VESSEL ID: JH-003 · 載重噸位: 1,000T"></div>
+      <div style="margin-top:6px;padding-top:10px;border-top:1px solid var(--b-hull)">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--t-dim);margin-bottom:10px;display:flex;align-items:center;gap:6px">📡 TELEMETRY<span id="vtele-status" style="font-size:7px;padding:2px 6px;border-radius:2px;border:1px solid var(--b-hull)">未設定</span></div>
+        <div class="fr"><label class="fl">船端 IP（VPN / 區域網路）</label><input class="fi" id="vtele-ip" placeholder="10.66.66.126（空白 = 不連線遙測）"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fr"><label class="fl">TCP 登記 Port</label><input class="fi" id="vtele-tcp" type="number" value="10000" placeholder="10000"></div>
+          <div class="fr"><label class="fl">UDP 監聽 Port</label><input class="fi" id="vtele-udp" type="number" value="0" placeholder="0 = 自動"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot" id="vmodal-foot">
+      <button class="bcnl" onclick="app.closeVModal()">取消</button>
+      <button class="bsav" id="vdelbtn" style="background:transparent;border-color:var(--red);color:var(--red);margin-right:auto;display:none" onclick="app.delVessel()">刪除</button>
+      <button class="bsav" onclick="app.saveVessel()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<button class="sb-toggle" id="sb-toggle" title="收合/展開側欄">◀</button>
+
+<!-- ══ SCRIPTS ═════════════════════════════════════════════════════════════ -->
+<script src="/static/js/app.js"></script>
+<script src="/static/js/telemetry.js"></script>
+</body>
+</html>

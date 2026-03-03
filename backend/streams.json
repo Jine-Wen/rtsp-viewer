@@ -1,0 +1,86 @@
+[
+  {
+    "id": "jh1-main",
+    "name": "VIVOTEK",
+    "rtsp_url": "http://localhost:8888/sim1/index.m3u8",
+    "group": "jh1",
+    "role": "main"
+  },
+  {
+    "id": "jh2-main",
+    "name": "\u4e3b\u7532\u677f\u93e1\u982d",
+    "rtsp_url": "rtsp://10.66.66.119:8554/cam1",
+    "group": "jh2",
+    "role": "main"
+  },
+  {
+    "id": "qg1-main",
+    "name": "\u4e3b\u7532\u677f\u93e1\u982d",
+    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/101",
+    "group": "qg1",
+    "role": "main"
+  },
+  {
+    "id": "qg1-bridge",
+    "name": "\u99d5\u99db\u8259\u93e1\u982d",
+    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/201",
+    "group": "qg1",
+    "role": "bridge"
+  },
+  {
+    "id": "qg1-deck",
+    "name": "\u5f8c\u7532\u677f\u93e1\u982d",
+    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/301",
+    "group": "qg1",
+    "role": "deck"
+  },
+  {
+    "id": "qg1-engine",
+    "name": "\u6a5f\u8259\u93e1\u982d",
+    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/401",
+    "group": "qg1",
+    "role": "engine"
+  },
+  {
+    "id": "test-cctv",
+    "name": "\u53f0\u7063 CCTV \u6e2c\u8a66\u6d41",
+    "rtsp_url": "http://localhost:8888/test-cctv/index.m3u8",
+    "group": "test",
+    "role": "cctv"
+  },
+  {
+    "id": "test-local",
+    "name": "\u672c\u6a5f\u6e2c\u8a66\u8a0a\u865f (\u8272\u689d)",
+    "rtsp_url": "http://localhost:8888/test-local/index.m3u8",
+    "group": "test",
+    "role": "main"
+  },
+  {
+    "id": "sim1",
+    "name": "\u6a21\u64ec\u5f71\u7247 1",
+    "rtsp_url": "rtsp://localhost:8554/sim1",
+    "group": "sim",
+    "role": "main"
+  },
+  {
+    "id": "sim2",
+    "name": "\u6a21\u64ec\u5f71\u7247 2",
+    "rtsp_url": "rtsp://localhost:8554/sim2",
+    "group": "sim",
+    "role": "main"
+  },
+  {
+    "id": "jh1--7mt1",
+    "name": "\u99d5\u99db\u8259",
+    "rtsp_url": "rtsp://10.66.66.126:8554/cam2",
+    "group": "jh1",
+    "role": "bridge"
+  },
+  {
+    "id": "jh2--x2dh",
+    "name": "\u99d5\u99db\u8259",
+    "rtsp_url": "rtsp://10.66.66.119:8554/cam1",
+    "group": "jh2",
+    "role": "bridge"
+  }
+]

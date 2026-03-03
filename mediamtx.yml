@@ -1,0 +1,94 @@
+rtsp: true
+rtspAddress: 0.0.0.0:8554
+rtmp: true
+rtmpAddress: 0.0.0.0:1935
+hls: true
+hlsAddress: 0.0.0.0:8888
+hlsVariant: mpegts
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsSegmentMaxSize: 50MB
+hlsAlwaysRemux: true
+hlsAllowOrigin: '*'
+webrtc: true
+webrtcAddress: 0.0.0.0:8889
+api: true
+apiAddress: 0.0.0.0:9997
+paths:
+  all: null
+  jh1-main:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://10.66.66.126:8554/cam1
+      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
+      -bufsize 1600k -g 30 -an -f rtsp rtsp://localhost:8554/jh1-main
+    runOnDemandRestart: true
+    runOnDemandStartTimeout: 15s
+    runOnDemandCloseAfter: 10s
+  jh2-main:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -hwaccel cuda -hwaccel_output_format cuda -c:v hevc_cuvid -i rtsp://10.66.66.119:8554/cam1
+      -vf "scale_cuda=1920:-2,hwdownload,format=nv12" -c:v libx264 -tune zerolatency
+      -preset ultrafast -crf 23 -g 30 -an -f rtsp rtsp://localhost:8554/jh2-main
+    runOnDemandRestart: true
+    runOnDemandStartTimeout: 30s
+    runOnDemandCloseAfter: 10s
+  qg1-main:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://admin:password@192.168.1.103:554/Streaming/Channels/101
+      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
+      -maxrate 800k -bufsize 800k -g 15 -keyint_min 15 -an -bsf:v h264_mp4toannexb
+      -f rtsp rtsp://localhost:8554/qg1-main
+    runOnDemandRestart: true
+    runOnDemandCloseAfter: 10s
+    runOnDemandStartTimeout: 15s
+  qg1-bridge:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://admin:password@192.168.1.103:554/Streaming/Channels/201
+      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
+      -maxrate 800k -bufsize 800k -g 15 -keyint_min 15 -an -bsf:v h264_mp4toannexb
+      -f rtsp rtsp://localhost:8554/qg1-bridge
+    runOnDemandRestart: true
+    runOnDemandCloseAfter: 10s
+    runOnDemandStartTimeout: 15s
+  qg1-deck:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://admin:password@192.168.1.103:554/Streaming/Channels/301
+      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
+      -maxrate 800k -bufsize 800k -g 15 -keyint_min 15 -an -bsf:v h264_mp4toannexb
+      -f rtsp rtsp://localhost:8554/qg1-deck
+    runOnDemandRestart: true
+    runOnDemandCloseAfter: 10s
+    runOnDemandStartTimeout: 15s
+  qg1-engine:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://admin:password@192.168.1.103:554/Streaming/Channels/401
+      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
+      -maxrate 800k -bufsize 800k -g 15 -keyint_min 15 -an -bsf:v h264_mp4toannexb
+      -f rtsp rtsp://localhost:8554/qg1-engine
+    runOnDemandRestart: true
+    runOnDemandCloseAfter: 10s
+    runOnDemandStartTimeout: 15s
+  test-cctv:
+    source: https://cctv-ss04.thb.gov.tw/T26-21K+323
+    sourceOnDemand: true
+  test-local:
+    runOnInit: ffmpeg -re -f lavfi -i testsrc2=size=1280x720:rate=30 -f lavfi -i sine=frequency=440:sample_rate=44100
+      -c:v libx264 -preset ultrafast -tune zerolatency -b:v 500k -c:a aac -b:a 64k
+      -f rtsp rtsp://localhost:8554/test-local
+    runOnInitRestart: true
+  jh1--7mt1:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://10.66.66.126:8554/cam2
+      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
+      -bufsize 1600k -g 30 -an -f rtsp rtsp://localhost:8554/jh1--7mt1
+    runOnDemandRestart: true
+    runOnDemandStartTimeout: 15s
+    runOnDemandCloseAfter: 10s
+  jh2--x2dh:
+    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
+      low_delay -hwaccel cuda -hwaccel_output_format cuda -c:v hevc_cuvid -i rtsp://10.66.66.119:8554/cam1
+      -vf "scale_cuda=1920:-2,hwdownload,format=nv12" -c:v libx264 -tune zerolatency
+      -preset ultrafast -crf 23 -g 30 -an -f rtsp rtsp://localhost:8554/jh2--x2dh
+    runOnDemandRestart: true
+    runOnDemandStartTimeout: 30s
+    runOnDemandCloseAfter: 10s
