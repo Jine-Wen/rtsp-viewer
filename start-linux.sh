@@ -13,7 +13,7 @@ NC='\033[0m'
 
 echo -e "${CYAN}"
 echo "  ╔══════════════════════════════════════╗"
-echo "  ║   傑海航運 Fleet Monitor  v2.0       ║"
+echo "  ║   傑海 Fleet Monitor  v2.0       ║"
 echo "  ║   JetseaAI RTSP Viewer - Starting    ║"
 echo "  ╚══════════════════════════════════════╝"
 echo -e "${NC}"

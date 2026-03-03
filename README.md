@@ -33,7 +33,7 @@ Browser Frontend  http://localhost:8080
 
 ---
 
-## �� Project Structure
+##  Project Structure
 
 ```
 rtsp-viewer/
@@ -105,11 +105,12 @@ chmod +x start-linux.sh
 ./start-linux.sh
 ```
 
-The script will:
-1. Verify that `mediamtx` is installed.
-2. Create a Python virtual environment under `backend/venv/` and install dependencies.
-3. Start **MediaMTX** with `mediamtx.yml` (logs → `mediamtx.log`).
-4. Start the **FastAPI** backend with `uvicorn` on port **8080** (logs → `/tmp/backend.log`).
+> **No manual setup needed.** The script automatically handles everything:
+> - ✅ Verifies `mediamtx` is installed
+> - ✅ Creates `backend/venv/` if it does not exist
+> - ✅ Installs / updates Python dependencies from `requirements.txt`
+> - ✅ Starts **MediaMTX** with `mediamtx.yml` (logs → `mediamtx.log`)
+> - ✅ Starts **FastAPI** backend with `uvicorn` on port **8080** (logs → `/tmp/backend.log`)
 
 ### 4. Open the web UI
 
@@ -236,7 +237,9 @@ http://localhost:8080/docs
 
 ---
 
-## 🛠 Manual Setup (without the shell script)
+## 🛠 Manual Setup (advanced, without the shell script)
+
+> If you prefer to start services individually instead of using `start-linux.sh`.
 
 ```bash
 # 1. Create and activate virtual environment
