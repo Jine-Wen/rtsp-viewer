@@ -12,14 +12,37 @@ logger = logging.getLogger(__name__)
 # ── GPU 偵測 ──────────────────────────────────────────────────────────────────
 
 def check_gpu() -> bool:
-    """檢查 NVIDIA GPU 是否可用（nvidia-smi 執行成功且有裝置）"""
+    """檢查 NVIDIA GPU 是否可用：
+    1. nvidia-smi 確認有 GPU 裝置
+    2. 實際執行 ffmpeg -hwaccel cuda 確認 CUDA 可初始化
+    """
     try:
-        result = subprocess.run(
+        smi = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True, text=True, timeout=5,
         )
-        return result.returncode == 0 and result.stdout.strip() != ""
+        if not (smi.returncode == 0 and smi.stdout.strip()):
+            return False
     except Exception:
+        return False
+
+    # 實際測試 CUDA 是否可以初始化（nvidia-smi 正常但 CUDA 仍可能失敗）
+    try:
+        cuda_test = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+                "-f", "lavfi", "-i", "nullsrc=s=128x128",
+                "-vframes", "1", "-f", "null", "-",
+            ],
+            capture_output=True, text=True, timeout=10,
+        )
+        ok = cuda_test.returncode == 0 and "CUDA_ERROR" not in cuda_test.stderr
+        if not ok:
+            logger.warning(f"[GPU] CUDA init failed: {cuda_test.stderr[:200]}")
+        return ok
+    except Exception as e:
+        logger.warning(f"[GPU] CUDA test failed: {e}")
         return False
 
 
@@ -146,20 +169,21 @@ def sync_path(stream_id: str, rtsp_url: str):
                 logger.info(f"[{stream_id}] H264 {width}x{height} → GPU encode")
 
             elif gpu_ok and not is_hevc and needs_scale:
-                # ── H264 + GPU + 需要縮放：CPU 縮放 + GPU 編碼 ──
+                # ── H264 + GPU + 需要縮放：CPU 縮放 + libx264
+                # NOTE: h264_nvenc 最大支援寬度 4096，來源超過時改用 CPU 編碼避免失敗
                 ffmpeg_cmd = (
                     f"ffmpeg -rtsp_transport tcp"
                     f" -fflags nobuffer+discardcorrupt -flags low_delay"
                     f" -probesize 32 -analyzeduration 0"
                     f" -i {rtsp_url}"
                     f' -vf "scale=1920:-2"'
-                    f" -c:v h264_nvenc -preset:v p1 -tune:v ll -zerolatency 1"
-                    f" -b:v 2000k -maxrate 3000k -bufsize 4000k -g 30 -an"
+                    f" -c:v libx264 -tune zerolatency -preset superfast -crf 28"
+                    f" -threads 8 -g 30 -sc_threshold 0 -an"
                     f" -f rtsp rtsp://localhost:8554/{stream_id}"
                 )
                 timeout = "30s"
-                mode = "scale→h264_nvenc (GPU)"
-                logger.info(f"[{stream_id}] H264 {width}x{height} → scale + GPU encode")
+                mode = "scale→libx264 (width>{} → CPU)".format(width)
+                logger.warning(f"[{stream_id}] H264 {width}x{height} exceeds nvenc limit → scale + CPU encode")
 
             else:
                 # ── CPU fallback（GPU 不可用）──
@@ -169,10 +193,11 @@ def sync_path(stream_id: str, rtsp_url: str):
                     f" -fflags nobuffer+discardcorrupt -flags low_delay"
                     f" -probesize 32 -analyzeduration 0"
                     f" -i {rtsp_url}{scale_filter}"
-                    f" -c:v libx264 -tune zerolatency -preset ultrafast -crf 23 -g 30 -an"
+                    f" -c:v libx264 -tune zerolatency -preset superfast -crf 28"
+                    f" -threads 8 -g 30 -sc_threshold 0 -an"
                     f" -f rtsp rtsp://localhost:8554/{stream_id}"
                 )
-                timeout = "15s"
+                timeout = "30s"
                 mode = "libx264 (CPU fallback)"
                 logger.warning(f"[{stream_id}] {codec} {width}x{height} → CPU encode (no GPU)")
 
@@ -210,3 +235,117 @@ def remove_path(stream_id: str):
             logger.info(f"mediamtx.yml ✕ [{stream_id}]")
     except Exception as e:
         logger.error(f"Failed to remove {stream_id} from mediamtx.yml: {e}")
+
+
+# ── 按需啟動 MediaMTX ────────────────────────────────────────────────────────
+
+import os
+import signal
+from config import MEDIAMTX_YML
+
+_mediamtx_process: subprocess.Popen | None = None
+
+
+def is_running() -> bool:
+    """檢查 MediaMTX 是否正在執行（先檢查內部 process，再用 pgrep 確認）"""
+    global _mediamtx_process
+    if _mediamtx_process is not None:
+        ret = _mediamtx_process.poll()
+        if ret is None:
+            return True  # 仍在執行中
+        else:
+            _mediamtx_process = None  # 已退出，清掉引用
+    # 用 pgrep 確認是否有外部啟動的 mediamtx 程序
+    try:
+        result = subprocess.run(["pgrep", "-x", "mediamtx"],
+                                capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def ensure_running(yml_path: str | None = None, log_path: str | None = None) -> bool:
+    """若 MediaMTX 尚未執行則啟動它，已在執行則直接回傳 True。
+
+    Returns:
+        True  → MediaMTX 已在執行（或成功啟動）
+        False → 啟動失敗
+    """
+    global _mediamtx_process
+
+    if is_running():
+        logger.info("[MediaMTX] already running, skip start")
+        return True
+
+    # 決定 yml 路徑（預設與 MEDIAMTX_YML 相同）
+    cfg_path = yml_path or str(MEDIAMTX_YML)
+    # log 寫到 mediamtx.log（與 yml 同目錄）
+    if log_path is None:
+        log_path = str(MEDIAMTX_YML.parent / "mediamtx.log")
+
+    logger.info(f"[MediaMTX] starting: mediamtx {cfg_path}")
+    try:
+        log_file = open(log_path, "a")
+        _mediamtx_process = subprocess.Popen(
+            ["mediamtx", cfg_path],
+            stdout=log_file,
+            stderr=log_file,
+        )
+        # 等最多 5 秒確認啟動
+        for _ in range(10):
+            import time
+            time.sleep(0.5)
+            if _mediamtx_process.poll() is not None:
+                logger.error("[MediaMTX] process exited immediately")
+                _mediamtx_process = None
+                return False
+            # 嘗試連線 API
+            try:
+                r = subprocess.run(
+                    ["curl", "-sf", "http://localhost:9997/v3/paths/list"],
+                    capture_output=True, timeout=2,
+                )
+                if r.returncode == 0:
+                    logger.info(f"[MediaMTX] started (PID {_mediamtx_process.pid})")
+                    return True
+            except Exception:
+                pass
+        logger.warning("[MediaMTX] started but API not yet ready (continuing anyway)")
+        return True
+    except FileNotFoundError:
+        logger.error("[MediaMTX] 'mediamtx' command not found, please install MediaMTX first")
+        return False
+    except Exception as e:
+        logger.error(f"[MediaMTX] failed to start: {e}")
+        return False
+
+
+def stop() -> bool:
+    """停止 MediaMTX 程序（本 process 啟動的 + 系統上所有 mediamtx）"""
+    global _mediamtx_process
+    stopped = False
+
+    if _mediamtx_process is not None:
+        try:
+            _mediamtx_process.terminate()
+            _mediamtx_process.wait(timeout=5)
+            logger.info("[MediaMTX] terminated")
+            stopped = True
+        except Exception as e:
+            logger.warning(f"[MediaMTX] terminate error: {e}")
+            try:
+                _mediamtx_process.kill()
+            except Exception:
+                pass
+        finally:
+            _mediamtx_process = None
+
+    # 清除系統上其他 mediamtx 程序
+    try:
+        subprocess.run(["pkill", "-x", "mediamtx"], capture_output=True)
+        stopped = True
+    except Exception:
+        pass
+
+    return stopped
+

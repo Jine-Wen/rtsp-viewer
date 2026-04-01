@@ -27,7 +27,7 @@ fi
 echo -e "${GREEN}✓ MediaMTX $(mediamtx --version 2>&1 | head -1)${NC}"
 
 # ── Step 2: 確認 Python venv ─────────────────────────
-echo -e "${YELLOW}[2/4]${NC} 確認 Python 環境..."
+echo -e "${YELLOW}[2/3]${NC} 確認 Python 環境..."
 if [ ! -d "backend/venv" ]; then
     echo -e "${YELLOW}  建立 venv...${NC}"
     python3 -m venv backend/venv
@@ -36,28 +36,13 @@ echo -e "${YELLOW}  安裝/更新套件...${NC}"
 backend/venv/bin/pip install -q -r backend/requirements.txt
 echo -e "${GREEN}✓ Python 環境就緒${NC}"
 
-# ── Step 3: 啟動 MediaMTX ────────────────────────────
-echo -e "${YELLOW}[3/4]${NC} 啟動 MediaMTX..."
-pkill -x mediamtx 2>/dev/null && sleep 1
+# ── （MediaMTX 不在啟動時自動啟動，將在使用者開啟影像時按需啟動）─────────────
 
-mediamtx "$PROJECT_DIR/mediamtx.yml" > "$PROJECT_DIR/mediamtx.log" 2>&1 &
-MEDIAMTX_PID=$!
-sleep 2
-
-if ps -p $MEDIAMTX_PID > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ MediaMTX 已啟動 (PID: $MEDIAMTX_PID)${NC}"
-    echo -e "  HLS:    http://localhost:8888"
-    echo -e "  WebRTC: http://localhost:8889"
-    echo -e "  API:    http://localhost:9997"
-else
-    echo -e "${RED}✗ MediaMTX 啟動失敗，查看 mediamtx.log:${NC}"
-    tail -10 "$PROJECT_DIR/mediamtx.log"
-    exit 1
-fi
-
-# ── Step 4: 啟動 FastAPI Backend ─────────────────────
-echo -e "${YELLOW}[4/4]${NC} 啟動 FastAPI Backend..."
-pkill -f "uvicorn main:app" 2>/dev/null && sleep 1
+# ── Step 3: 啟動 FastAPI Backend ─────────────────────
+echo -e "${YELLOW}[3/3]${NC} 啟動 FastAPI Backend..."
+pkill -f "uvicorn main:app" 2>/dev/null || true
+sleep 2   # 等待 port 10100~10102 確實釋放
+pkill -9 -f "uvicorn main:app" 2>/dev/null || true
 
 cd "$PROJECT_DIR/backend"
 ./venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080 > /tmp/backend.log 2>&1 &
@@ -80,8 +65,8 @@ echo -e "${GREEN}║  ✓ 所有服務啟動完成                  ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  🌐 前端介面:   ${CYAN}http://localhost:8080${NC}"
-echo -e "  📡 MediaMTX:   ${CYAN}http://localhost:8889/test-local${NC}  (WebRTC 測試)"
-echo -e "  📋 API 文件:   ${CYAN}http://localhost:8080/docs${NC}"
+echo -e "  � API 文件:   ${CYAN}http://localhost:8080/docs${NC}"
+echo -e "  � MediaMTX:   ${YELLOW}按需啟動（點擊開啟影像時自動啟動）${NC}"
 echo ""
 echo -e "  📝 Log:  tail -f $PROJECT_DIR/mediamtx.log"
 echo -e "  🛑 停止: ./stop.sh"

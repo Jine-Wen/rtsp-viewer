@@ -4,7 +4,7 @@
     "name": "傑海一號",
     "icon": "🚢",
     "meta": "VESSEL ID: JH-001 · 載重噸位: 2,500T",
-    "telemetry_ip": "10.66.66.126",
+    "telemetry_ip": "10.66.66.160",
     "telemetry_tcp_port": 10000,
     "telemetry_udp_port": 10100
   },
@@ -15,15 +15,15 @@
     "meta": "VESSEL ID: JH-002 · 載重噸位: 3,200T",
     "telemetry_ip": "10.66.66.119",
     "telemetry_tcp_port": 10000,
-    "telemetry_udp_port": 0
+    "telemetry_udp_port": 10101
   },
   {
     "id": "qg1",
     "name": "奇光一號",
     "icon": "⚓",
     "meta": "VESSEL ID: QG-001 · 載重噸位: 1,800T",
-    "telemetry_ip": "",
+    "telemetry_ip": "10.66.66.118",
     "telemetry_tcp_port": 10000,
-    "telemetry_udp_port": 0
+    "telemetry_udp_port": 10102
   }
 ]

@@ -2,7 +2,7 @@
   {
     "id": "jh1-main",
     "name": "VIVOTEK",
-    "rtsp_url": "http://localhost:8888/sim1/index.m3u8",
+    "rtsp_url": "rtsp://10.66.66.160:8554/cam1",
     "group": "jh1",
     "role": "main"
   },
@@ -16,7 +16,7 @@
   {
     "id": "qg1-main",
     "name": "\u4e3b\u7532\u677f\u93e1\u982d",
-    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/101",
+    "rtsp_url": "rtsp://10.66.66.118:8554/cam1",
     "group": "qg1",
     "role": "main"
   },
@@ -26,20 +26,6 @@
     "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/201",
     "group": "qg1",
     "role": "bridge"
-  },
-  {
-    "id": "qg1-deck",
-    "name": "\u5f8c\u7532\u677f\u93e1\u982d",
-    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/301",
-    "group": "qg1",
-    "role": "deck"
-  },
-  {
-    "id": "qg1-engine",
-    "name": "\u6a5f\u8259\u93e1\u982d",
-    "rtsp_url": "rtsp://admin:password@192.168.1.103:554/Streaming/Channels/401",
-    "group": "qg1",
-    "role": "engine"
   },
   {
     "id": "test-cctv",
@@ -72,7 +58,7 @@
   {
     "id": "jh1--7mt1",
     "name": "\u99d5\u99db\u8259",
-    "rtsp_url": "rtsp://10.66.66.126:8554/cam2",
+    "rtsp_url": "rtsp://10.66.66.160:8554/cam2",
     "group": "jh1",
     "role": "bridge"
   },

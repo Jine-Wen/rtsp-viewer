@@ -14,6 +14,11 @@
   let myLocMarker = null, myLocLine = null;
   let myLat = null, myLon = null;
   let geoWatchId = null;
+  // 手動覆蓋位置（使用者主動點 ✎ 設定）
+  let manualLat = null, manualLon = null;
+  let gpsManualMode = false;   // true = 目前顯示的是手動座標
+  // GPS 最新值（即使在手動模式也持續背景更新，供 reset 時立即恢復）
+  let _liveGpsLat = null, _liveGpsLon = null;
   // 測量圖釘
   let pinMarker = null, pinLine = null;
   let pinLat = null, pinLon = null;
@@ -93,6 +98,54 @@
     // 載入已儲存的圖釘 & 啟動 GPS
     loadPinFromStorage();
     startGpsWatch();
+
+    // ── Recenter 按鈕：直接插入 Leaflet container ──
+    const recenterBtn = document.createElement('button');
+    recenterBtn.id = 'minimap-recenter';
+    recenterBtn.title = '回到我的位置';
+    recenterBtn.innerHTML = `<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor">
+      <circle cx="8" cy="8" r="2.5"/>
+      <path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+      <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1"/>
+    </svg>`;
+    // inline style 確保不被任何其他 CSS 覆蓋
+    recenterBtn.style.cssText = [
+      'position:absolute',
+      'right:6px',
+      'bottom:6px',
+      'z-index:1000',
+      'width:22px',
+      'height:22px',
+      'background:rgba(5,8,13,.75)',
+      'border:1px solid rgba(255,255,255,.2)',
+      'border-radius:4px',
+      'color:rgba(255,255,255,.5)',
+      'cursor:pointer',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'padding:0',
+      'pointer-events:all',
+      'box-shadow:0 1px 6px rgba(0,0,0,.6)',
+    ].join(';');
+    recenterBtn.addEventListener('mouseenter', ()=>{
+      recenterBtn.style.background = 'rgba(66,133,244,.25)';
+      recenterBtn.style.borderColor = 'rgba(66,133,244,.7)';
+      recenterBtn.style.color = '#4285f4';
+    });
+    recenterBtn.addEventListener('mouseleave', ()=>{
+      recenterBtn.style.background = 'rgba(5,8,13,.75)';
+      recenterBtn.style.borderColor = 'rgba(255,255,255,.2)';
+      recenterBtn.style.color = 'rgba(255,255,255,.5)';
+    });
+    recenterBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if(myLat !== null && myLon !== null){
+        map.panTo([myLat, myLon], { animate: true, duration: 0.5 });
+      }
+    });
+    recenterBtn.addEventListener('mousedown', (ev) => ev.stopPropagation());
+    map.getContainer().appendChild(recenterBtn);
 
     const btn = document.getElementById('minimap-toggle');
     const wrap = document.getElementById('minimap-wrap');
@@ -214,26 +267,159 @@
   function startGpsWatch(){
     if(!navigator.geolocation) return;
     if(geoWatchId !== null) return;
+
+    // 先用 getCurrentPosition 快速取得初始位置（不等 watchPosition 暖機）
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        _liveGpsLat = pos.coords.latitude;
+        _liveGpsLon = pos.coords.longitude;
+        if(!gpsManualMode) _applyGpsPos(_liveGpsLat, _liveGpsLon);
+      },
+      (err) => { console.warn('[GPS init]', err.message); },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+
+    // 持續追蹤
     geoWatchId = navigator.geolocation.watchPosition(
       (pos) => {
-        myLat = pos.coords.latitude;
-        myLon = pos.coords.longitude;
-        if(myLocMarker){
-          myLocMarker.setLatLng([myLat, myLon]);
-          myLocMarker.setOpacity(1);
-        }
-        updateMyLocLine();
-        updateGpsDistance();
-        // 更新座標顯示
-        const el1 = document.getElementById('my-loc-lat');
-        const el2 = document.getElementById('my-loc-lon');
-        if(el1) el1.textContent = myLat.toFixed(6) + '°';
-        if(el2) el2.textContent = myLon.toFixed(6) + '°';
+        // 無論何種模式，先靜默儲存最新 GPS 座標
+        _liveGpsLat = pos.coords.latitude;
+        _liveGpsLon = pos.coords.longitude;
+        // 手動模式時不更新藍點顯示
+        if(gpsManualMode) return;
+        _applyGpsPos(_liveGpsLat, _liveGpsLon);
       },
-      (err) => { console.warn('[GPS]', err.message); },
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+      (err) => {
+        console.warn('[GPS watch]', err.message);
+        // timeout 時重啟 watch（不讓它死掉）
+        if(err.code === err.TIMEOUT){
+          navigator.geolocation.clearWatch(geoWatchId);
+          geoWatchId = null;
+          setTimeout(startGpsWatch, 3000);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
     );
   }
+
+  /** 將座標套用到藍點 & 座標列顯示 */
+  function _applyGpsPos(lat, lon){
+    myLat = lat;
+    myLon = lon;
+    if(myLocMarker){
+      myLocMarker.setLatLng([lat, lon]);
+      myLocMarker.setOpacity(1);
+    }
+    updateMyLocLine();
+    updateGpsDistance();
+    const el1 = document.getElementById('my-loc-lat');
+    const el2 = document.getElementById('my-loc-lon');
+    if(el1) el1.textContent = lat.toFixed(6) + '°';
+    if(el2) el2.textContent = lon.toFixed(6) + '°';
+  }
+
+  // ── 手動修正 GPS 位置 ─────────────────────────────────────────────────────
+
+  /** 切換手動輸入列顯示/隱藏 */
+  function gpsToggleEdit(){
+    const wrap = document.getElementById('gps-manual-wrap');
+    const btn  = document.getElementById('gps-edit-btn');
+    if(!wrap) return;
+    // 若手動模式已啟用，點鉛筆重新展開輸入列修改
+    const open = wrap.style.display === 'none' || wrap.style.display === '';
+    wrap.style.display = open ? 'flex' : 'none';
+    if(btn) btn.classList.toggle('active', open);
+    if(open){
+      const inLat = document.getElementById('gps-manual-lat');
+      const inLon = document.getElementById('gps-manual-lon');
+      // 預填：若有手動值就填手動值，否則填最新 GPS
+      const fillLat = manualLat !== null ? manualLat : myLat;
+      const fillLon = manualLon !== null ? manualLon : myLon;
+      if(inLat && fillLat !== null) inLat.value = fillLat.toFixed(6);
+      if(inLon && fillLon !== null) inLon.value = fillLon.toFixed(6);
+      setTimeout(()=>{ const f=document.getElementById('gps-manual-lat'); if(f) f.focus(); }, 50);
+    }
+  }
+
+  /** 套用手動輸入的座標 */
+  function gpsApplyManual(){
+    const inLat = document.getElementById('gps-manual-lat');
+    const inLon = document.getElementById('gps-manual-lon');
+    if(!inLat || !inLon) return;
+    const lat = parseFloat(inLat.value);
+    const lon = parseFloat(inLon.value);
+    if(isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180){
+      inLat.style.borderColor = 'rgba(255,61,87,.6)';
+      inLon.style.borderColor = 'rgba(255,61,87,.6)';
+      return;
+    }
+    inLat.style.borderColor = '';
+    inLon.style.borderColor = '';
+    manualLat = lat;
+    manualLon = lon;
+    gpsManualMode = true;
+    _applyGpsPos(lat, lon);
+    // 座標列標示手動模式（小寫 ° 後加標記）
+    const el1 = document.getElementById('my-loc-lat');
+    const el2 = document.getElementById('my-loc-lon');
+    if(el1) el1.textContent = lat.toFixed(6) + '°';
+    if(el2) el2.textContent = lon.toFixed(6) + '°';
+    // GPS 標籤變橘色
+    const dot = document.getElementById('gps-dot');
+    const lbl = document.getElementById('gps-lbl');
+    if(dot){ dot.style.background='#f0a500'; dot.style.boxShadow='0 0 4px rgba(240,165,0,.5)'; }
+    if(lbl){ lbl.style.color='rgba(240,165,0,.65)'; lbl.textContent='MAN'; }
+    // 收起輸入列，展開手動模式提示列
+    const wrap = document.getElementById('gps-manual-wrap');
+    if(wrap) wrap.style.display = 'none';
+    const active = document.getElementById('gps-manual-active');
+    if(active) active.style.display = 'flex';
+    const btn = document.getElementById('gps-edit-btn');
+    if(btn) btn.classList.add('active');
+  }
+
+  /** 恢復自動 GPS */
+  function gpsResetManual(){
+    manualLat = null;
+    manualLon = null;
+    gpsManualMode = false;
+    // 還原 GPS 標籤
+    const dot = document.getElementById('gps-dot');
+    const lbl = document.getElementById('gps-lbl');
+    if(dot){ dot.style.background=''; dot.style.boxShadow=''; }
+    if(lbl){ lbl.style.color=''; lbl.textContent='GPS'; }
+    // 清空 input
+    const inLat = document.getElementById('gps-manual-lat');
+    const inLon = document.getElementById('gps-manual-lon');
+    if(inLat) inLat.value = '';
+    if(inLon) inLon.value = '';
+    // 隱藏輸入列與手動模式提示列
+    const wrap = document.getElementById('gps-manual-wrap');
+    if(wrap) wrap.style.display = 'none';
+    const active = document.getElementById('gps-manual-active');
+    if(active) active.style.display = 'none';
+    const btn = document.getElementById('gps-edit-btn');
+    if(btn) btn.classList.remove('active');
+    // 立即恢復藍點到最新 GPS 位置
+    if(_liveGpsLat !== null && _liveGpsLon !== null){
+      _applyGpsPos(_liveGpsLat, _liveGpsLon);
+    } else if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          _liveGpsLat = pos.coords.latitude;
+          _liveGpsLon = pos.coords.longitude;
+          if(!gpsManualMode) _applyGpsPos(_liveGpsLat, _liveGpsLon);
+        },
+        (err) => { console.warn('[GPS reset]', err.message); },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }
+
+  // 暴露給 HTML onclick 使用
+  window.gpsToggleEdit   = gpsToggleEdit;
+  window.gpsApplyManual  = gpsApplyManual;
+  window.gpsResetManual  = gpsResetManual;
 
   // ── 測量圖釘 ──────────────────────────────────────────────────────────
   function togglePinEditMode(force){
@@ -381,7 +567,8 @@
       cog:        document.getElementById('tele-cog'),
       cogNeedle:  document.getElementById('cog-needle'),
       roll:       document.getElementById('tele-roll'),
-      ahiHorizon: document.getElementById('ahi-horizon'),
+      ahiRoll:    document.getElementById('ahi-roll'),
+      ahiPitch:   document.getElementById('ahi-pitch'),
       ahiRollPtr: document.getElementById('ahi-roll-ptr'),
       pitch:      document.getElementById('tele-pitch'),
       throttle:   document.getElementById('tele-throttle'),
@@ -464,7 +651,8 @@
     if(e.cogNeedle) e.cogNeedle.style.transform = 'rotate(0deg)';
     if(e.roll) e.roll.textContent = '-.-°';
     if(e.pitch) e.pitch.textContent = '-.-°';
-    if(e.ahiHorizon) e.ahiHorizon.setAttribute('transform', 'rotate(0,60,60) translate(0,0)');
+    if(e.ahiRoll)  e.ahiRoll.setAttribute('transform',  'rotate(0,60,60)');
+    if(e.ahiPitch) e.ahiPitch.setAttribute('transform', 'translate(0,0)');
     if(e.ahiRollPtr) e.ahiRollPtr.setAttribute('transform', 'rotate(0,60,60)');
     clearTrack();
     // 清除連線 & 距離（GPS 位置 & 圖釘保留，只清連線）
@@ -609,17 +797,17 @@
     _accCog += shortAngle(_accCog, d.cog);
     if(e.cogNeedle) e.cogNeedle.style.transform = `rotate(${_accCog}deg)`;
 
-    // ── AHI 人工水平儀（合併 Roll + Pitch）──
-    const rollClamped = Math.max(-35, Math.min(35, d.roll));
-    const pitchClamped = Math.max(-20, Math.min(20, d.pitch));
-    // pitch → 每度 1.8px 垂直位移 (±20° → ±36px)
-    const pitchPx = pitchClamped * 1.8;
-    // horizon 群組同時 rotate(roll) + translateY(pitch)
-    if(e.ahiHorizon) e.ahiHorizon.setAttribute('transform',
-      `rotate(${-rollClamped.toFixed(1)},60,60) translate(0,${pitchPx.toFixed(1)})`);
-    // roll 三角指標只旋轉
-    if(e.ahiRollPtr) e.ahiRollPtr.setAttribute('transform',
-      `rotate(${-rollClamped.toFixed(1)},60,60)`);
+    // ── AHI 人工水平儀（分層：外層 roll 旋轉，內層 pitch 平移）──
+    const rollDeg   = d.roll  || 0;
+    const pitchDeg  = d.pitch || 0;
+    // pitch: 仰角為正（+pitch → 地平線上移 → translate 負方向）
+    // 每度 2px，±30° = ±60px（足夠大的背景不會露底）
+    const pitchPx   = -pitchDeg * 2.0;
+    // roll: 右傾為正（順時針），地平線跟著右傾 → SVG rotate 正值
+    if(e.ahiRoll)  e.ahiRoll.setAttribute('transform',  `rotate(${rollDeg.toFixed(2)},60,60)`);
+    if(e.ahiPitch) e.ahiPitch.setAttribute('transform', `translate(0,${pitchPx.toFixed(2)})`);
+    // roll 三角指標：與外層 roll group 同方向轉
+    if(e.ahiRollPtr) e.ahiRollPtr.setAttribute('transform', `rotate(${rollDeg.toFixed(2)},60,60)`);
     if(e.roll){
       e.roll.textContent = (d.roll >= 0 ? '+' : '') + d.roll.toFixed(1) + '°';
       e.roll.style.color = Math.abs(d.roll) > 15 ? '#ff3d57' : Math.abs(d.roll) > 7 ? '#f0a500' : '#eef2f7';

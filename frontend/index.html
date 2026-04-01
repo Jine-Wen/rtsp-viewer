@@ -84,7 +84,9 @@
 
     <!-- ── 小地圖 ─────────────────────────────────────────────── -->
     <div id="minimap-wrap">
-      <div id="minimap"></div>
+      <div id="minimap-area">
+        <div id="minimap"></div>
+      </div>
       <div id="map-coord-bar">
         <!-- 船隻座標 -->
         <div class="cb-section cb-vessel">
@@ -97,16 +99,32 @@
             <span class="cb-val amber" id="tele-lon">----.------°</span>
           </div>
         </div>
-        <!-- GPS 我的位置 + 距離同行 -->
+        <!-- GPS 我的位置 -->
         <div class="cb-section cb-myloc">
           <div class="cb-row">
-            <span class="cb-dot blue"></span>
-            <span class="cb-lbl blue">GPS</span>
+            <span class="cb-dot blue" id="gps-dot"></span>
+            <span class="cb-lbl blue" id="gps-lbl">GPS</span>
             <span class="cb-val blue-dim" id="my-loc-lat">--°</span>
             <span class="cb-val blue-dim" id="my-loc-lon">--°</span>
-            <span class="cb-val dim cb-gps-dist" id="gps-dist-row" style="display:none">
-              <span id="gps-dist-val">--</span>
-            </span>
+            <span class="cb-val dim cb-gps-dist" id="gps-dist-row" style="display:none"><span id="gps-dist-val">--</span></span>
+            <button id="gps-edit-btn" class="cb-btn-icon" title="手動修正我的位置" onclick="gpsToggleEdit()">
+              <svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M11.5 1.5a1.5 1.5 0 0 1 2.12 2.12l-8.5 8.5-2.83.71.71-2.83 8.5-8.5z"/></svg>
+            </button>
+          </div>
+          <!-- 手動輸入列（展開） -->
+          <div id="gps-manual-wrap" class="gps-manual-wrap" style="display:none">
+            <div class="gps-manual-inputs">
+              <input class="gps-manual-input" id="gps-manual-lat" type="text" inputmode="decimal" placeholder="23.123456"
+                onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+              <input class="gps-manual-input" id="gps-manual-lon" type="text" inputmode="decimal" placeholder="120.123456"
+                onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+              <button class="gps-manual-apply" onmousedown="event.stopPropagation()" onclick="gpsApplyManual()">套用</button>
+            </div>
+          </div>
+          <!-- 手動模式提示列（套用後顯示） -->
+          <div id="gps-manual-active" class="gps-manual-active" style="display:none">
+            <span class="gps-manual-active-lbl">手動模式</span>
+            <button class="gps-manual-reset" onmousedown="event.stopPropagation()" onclick="gpsResetManual()">恢復 GPS</button>
           </div>
         </div>
         <!-- 圖釘工具 + 座標 + 距離同行 -->
@@ -186,52 +204,101 @@
       <div class="ahi-panel">
         <div class="ahi-title">ATTITUDE</div>
         <div class="ahi-globe-wrap">
+          <!--
+            AHI 正確邏輯：
+            · ahi-roll  : 只做 rotate(roll, 60,60)          → 天地整體跟著滾轉
+            · ahi-pitch : 只做 translate(0, pitchPx)         → 天地上下平移
+            · 兩層 nest，pitch 在內層（先平移再滾轉）
+            · 刻度線跟著天地一起動
+            · 中央飛機圖標與 roll 指標固定在外層
+          -->
           <svg viewBox="0 0 120 120" class="ahi-svg">
             <defs>
-              <clipPath id="ahi-clip"><circle cx="60" cy="60" r="54"/></clipPath>
+              <!-- 裁切圓 -->
+              <clipPath id="ahi-clip"><circle cx="60" cy="60" r="52"/></clipPath>
+              <!-- 天空漸層 -->
               <linearGradient id="ahi-sky" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#1a5276"/>
-                <stop offset="100%" stop-color="#2e86c1"/>
+                <stop offset="0%"   stop-color="#0d3b5e"/>
+                <stop offset="100%" stop-color="#1a6fa8"/>
               </linearGradient>
+              <!-- 地面漸層 -->
               <linearGradient id="ahi-gnd" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#784212"/>
-                <stop offset="100%" stop-color="#5b3a1a"/>
+                <stop offset="0%"   stop-color="#6b3a10"/>
+                <stop offset="100%" stop-color="#3d1f08"/>
               </linearGradient>
             </defs>
-            <!-- 外環 -->
-            <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
-            <!-- 天地背景（受 pitch 平移、受 roll 旋轉） -->
-            <g id="ahi-horizon" clip-path="url(#ahi-clip)">
-              <rect x="-60" y="-120" width="240" height="180" fill="url(#ahi-sky)"/>
-              <rect x="-60" y="60" width="240" height="180" fill="url(#ahi-gnd)"/>
-              <line x1="-60" y1="60" x2="180" y2="60" stroke="rgba(255,255,255,.7)" stroke-width="1.2"/>
-              <!-- pitch 刻度線 -->
-              <line x1="40" y1="42" x2="80" y2="42" stroke="rgba(255,255,255,.3)" stroke-width="0.7"/>
-              <text x="83" y="43.5" fill="rgba(255,255,255,.25)" font-size="5" font-family="monospace">10</text>
-              <line x1="45" y1="51" x2="75" y2="51" stroke="rgba(255,255,255,.2)" stroke-width="0.5"/>
-              <text x="77" y="52.5" fill="rgba(255,255,255,.18)" font-size="4.5" font-family="monospace">5</text>
-              <line x1="45" y1="69" x2="75" y2="69" stroke="rgba(255,255,255,.2)" stroke-width="0.5"/>
-              <text x="77" y="70.5" fill="rgba(255,255,255,.18)" font-size="4.5" font-family="monospace">5</text>
-              <line x1="40" y1="78" x2="80" y2="78" stroke="rgba(255,255,255,.3)" stroke-width="0.7"/>
-              <text x="83" y="79.5" fill="rgba(255,255,255,.25)" font-size="5" font-family="monospace">10</text>
+
+            <!-- ① 外環 (固定) -->
+            <circle cx="60" cy="60" r="54" fill="rgba(5,8,13,.4)" stroke="rgba(255,255,255,.15)" stroke-width="1"/>
+
+            <!-- ② roll 刻度弧 (固定，靠近外環內側) -->
+            <g opacity="0.4" stroke="#fff" stroke-linecap="round">
+              <!-- 頂部 0° 長刻度 -->
+              <line x1="60" y1="7"  x2="60" y2="14" stroke-width="1.2"/>
+              <!-- ±30° -->
+              <line x1="31.0" y1="14.5" x2="33.9" y2="19.5" stroke-width="0.8"/>
+              <line x1="89.0" y1="14.5" x2="86.1" y2="19.5" stroke-width="0.8"/>
+              <!-- ±20° -->
+              <line x1="40.3" y1="10.2" x2="42.3" y2="14.7" stroke-width="0.7"/>
+              <line x1="79.7" y1="10.2" x2="77.7" y2="14.7" stroke-width="0.7"/>
+              <!-- ±10° -->
+              <line x1="49.5" y1="8.1"  x2="50.8" y2="12.4" stroke-width="0.6"/>
+              <line x1="70.5" y1="8.1"  x2="69.2" y2="12.4" stroke-width="0.6"/>
+              <!-- ±45° -->
+              <line x1="21.5" y1="21.5" x2="25.5" y2="25.5" stroke-width="1.0"/>
+              <line x1="98.5" y1="21.5" x2="94.5" y2="25.5" stroke-width="1.0"/>
             </g>
-            <!-- roll 刻度弧（固定） -->
-            <g opacity="0.35">
-              <line x1="60" y1="8" x2="60" y2="14" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
-              <line x1="40.3" y1="11.5" x2="42.7" y2="17" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
-              <line x1="79.7" y1="11.5" x2="77.3" y2="17" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
-              <line x1="23.2" y1="23.2" x2="27.4" y2="27.4" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
-              <line x1="96.8" y1="23.2" x2="92.6" y2="27.4" stroke="#fff" stroke-width="0.7" stroke-linecap="round"/>
+
+            <!-- ③ 天地背景：外層 rotate(roll)，內層 translate(pitch) -->
+            <g id="ahi-roll" transform="rotate(0,60,60)">
+              <g id="ahi-pitch" transform="translate(0,0)" clip-path="url(#ahi-clip)">
+                <!-- 天空：足夠大，不會露底 -->
+                <rect x="-120" y="-240" width="360" height="300" fill="url(#ahi-sky)"/>
+                <!-- 地面：足夠大 -->
+                <rect x="-120" y="60"  width="360" height="300" fill="url(#ahi-gnd)"/>
+                <!-- 地平線 -->
+                <line x1="-120" y1="60" x2="240" y2="60" stroke="rgba(255,255,255,.75)" stroke-width="1.2"/>
+                <!-- pitch 刻度：以圓心 y=60 為基準，每度 2px -->
+                <!-- +10° 仰角 → 往上 20px → y=40 -->
+                <line x1="38" y1="40" x2="82" y2="40" stroke="rgba(255,255,255,.35)" stroke-width="0.8"/>
+                <text x="84" y="42" fill="rgba(255,255,255,.3)" font-size="5" font-family="'JetBrains Mono',monospace">10</text>
+                <text x="21" y="42" fill="rgba(255,255,255,.3)" font-size="5" font-family="'JetBrains Mono',monospace" text-anchor="end">10</text>
+                <!-- +5° → y=50 -->
+                <line x1="46" y1="50" x2="74" y2="50" stroke="rgba(255,255,255,.22)" stroke-width="0.6"/>
+                <!-- -5° → y=70 -->
+                <line x1="46" y1="70" x2="74" y2="70" stroke="rgba(255,255,255,.22)" stroke-width="0.6"/>
+                <!-- -10° → y=80 -->
+                <line x1="38" y1="80" x2="82" y2="80" stroke="rgba(255,255,255,.35)" stroke-width="0.8"/>
+                <text x="84" y="82" fill="rgba(255,255,255,.3)" font-size="5" font-family="'JetBrains Mono',monospace">10</text>
+                <text x="21" y="82" fill="rgba(255,255,255,.3)" font-size="5" font-family="'JetBrains Mono',monospace" text-anchor="end">10</text>
+                <!-- +20° → y=20 -->
+                <line x1="38" y1="20" x2="82" y2="20" stroke="rgba(255,255,255,.28)" stroke-width="0.7"/>
+                <text x="84" y="22" fill="rgba(255,255,255,.22)" font-size="5" font-family="'JetBrains Mono',monospace">20</text>
+                <text x="21" y="22" fill="rgba(255,255,255,.22)" font-size="5" font-family="'JetBrains Mono',monospace" text-anchor="end">20</text>
+                <!-- -20° → y=100 -->
+                <line x1="38" y1="100" x2="82" y2="100" stroke="rgba(255,255,255,.28)" stroke-width="0.7"/>
+                <text x="84" y="102" fill="rgba(255,255,255,.22)" font-size="5" font-family="'JetBrains Mono',monospace">20</text>
+                <text x="21" y="102" fill="rgba(255,255,255,.22)" font-size="5" font-family="'JetBrains Mono',monospace" text-anchor="end">20</text>
+              </g>
             </g>
-            <!-- roll 三角指標（隨 roll 轉動） -->
-            <g id="ahi-roll-ptr">
-              <polygon points="60,12 57,6 63,6" fill="#f0a500" opacity="0.9"/>
+
+            <!-- ④ roll 三角指標（跟著 roll 轉，不受 clip） -->
+            <g id="ahi-roll-ptr" transform="rotate(0,60,60)">
+              <polygon points="60,14 57,8 63,8" fill="#f0a500" opacity="0.95"/>
             </g>
-            <!-- 中央固定飛機圖標 -->
-            <circle cx="60" cy="60" r="3" fill="none" stroke="#f0a500" stroke-width="1.8"/>
-            <line x1="30" y1="60" x2="52" y2="60" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
-            <line x1="68" y1="60" x2="90" y2="60" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
-            <line x1="56" y1="72" x2="64" y2="72" stroke="#f0a500" stroke-width="1.5" stroke-linecap="round"/>
+
+            <!-- ⑤ 中央固定飛機圖標（永遠在最上層，固定） -->
+            <!-- 中央點 -->
+            <circle cx="60" cy="60" r="2.5" fill="none" stroke="#f0a500" stroke-width="1.8"/>
+            <!-- 左翼 -->
+            <line x1="34" y1="60" x2="54" y2="60" stroke="#f0a500" stroke-width="2.2" stroke-linecap="round"/>
+            <!-- 右翼 -->
+            <line x1="66" y1="60" x2="86" y2="60" stroke="#f0a500" stroke-width="2.2" stroke-linecap="round"/>
+            <!-- 尾翼 -->
+            <line x1="56" y1="70" x2="64" y2="70" stroke="#f0a500" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- 中央水平參考線（兩側短線） -->
+            <line x1="18" y1="60" x2="25" y2="60" stroke="rgba(255,255,255,.3)" stroke-width="0.8"/>
+            <line x1="95" y1="60" x2="102" y2="60" stroke="rgba(255,255,255,.3)" stroke-width="0.8"/>
           </svg>
         </div>
         <div class="ahi-vals">

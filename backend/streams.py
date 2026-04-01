@@ -13,6 +13,7 @@ from typing import List
 
 from config import STREAMS_FILE, MEDIAMTX_API
 from models import StreamConfig, StreamResponse
+import mediamtx as _mediamtx_mod
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,18 @@ class StreamManager:
         async def check_all():
             while True:
                 try:
+                    # MediaMTX 未執行時，跳過 HTTP 查詢，直接標記所有非 manual_stopped 的
+                    # stream 為 offline，避免每個 httpx 請求逾時 3 秒卡住 event loop
+                    if not _mediamtx_mod.is_running():
+                        now_iso = datetime.now().isoformat()
+                        for stream_id in list(self.streams.keys()):
+                            self.stream_status[stream_id] = {
+                                "status": "offline",
+                                "last_checked": now_iso,
+                            }
+                        await asyncio.sleep(5)
+                        continue
+
                     for stream_id in list(self.streams.keys()):
                         if stream_id in self.manual_stopped:
                             self.stream_status[stream_id] = {

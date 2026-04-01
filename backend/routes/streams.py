@@ -87,13 +87,26 @@ async def delete_stream(stream_id: str):
 
 @router.post("/api/streams/{stream_id}/start")
 async def start_stream(stream_id: str):
-    """啟動串流：依 URL 類型決定啟動方式"""
+    """啟動串流：依 URL 類型決定啟動方式（若 MediaMTX 未啟動則先啟動它）"""
     if stream_id not in manager.streams:
         raise HTTPException(status_code=404, detail=f"Stream {stream_id} not found")
 
     stream = manager.streams[stream_id]
     rtsp_url = stream.rtsp_url
     manager.manual_stopped.discard(stream_id)
+
+    # ── 確保 MediaMTX 已啟動（按需啟動）────────────────────────────────────
+    if not mediamtx.is_running():
+        logger.info(f"[start_stream] MediaMTX not running, starting it now...")
+        ok = await asyncio.get_event_loop().run_in_executor(
+            None, mediamtx.ensure_running
+        )
+        if not ok:
+            raise HTTPException(
+                status_code=503,
+                detail="MediaMTX 無法啟動，請確認已安裝 mediamtx 並在 PATH 中"
+            )
+        logger.info("[start_stream] MediaMTX started on-demand")
 
     # Case 1: HLS URL → 內建/轉播路徑
     if rtsp_url.startswith("http://localhost:8888") or rtsp_url.startswith("http://127.0.0.1:8888"):

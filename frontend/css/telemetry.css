@@ -295,7 +295,34 @@
 #minimap-wrap:active{cursor:grabbing}
 #minimap-wrap:hover{border-color:rgba(240,165,0,.5)}
 #minimap-wrap.hidden{display:none}
-#minimap{width:100%;flex:1;min-height:80px}
+/* 地圖畫面容器（relative + isolation，確保 z-index stacking context 獨立） */
+#minimap-area{
+  position:relative;
+  width:100%;flex:1;min-height:80px;
+  display:flex;flex-direction:column;
+}
+#minimap{width:100%;flex:1;position:relative;}
+/* Recenter 按鈕：疊在地圖右下角 */
+#minimap-recenter{
+  position:absolute;right:6px;bottom:6px;
+  z-index:1000;
+  width:22px;height:22px;
+  background:rgba(5,8,13,.72);
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:4px;
+  color:rgba(255,255,255,.45);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  padding:0;
+  transition:color .15s,background .15s,border-color .15s;
+  pointer-events:all;
+  box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+#minimap-recenter:hover{
+  background:rgba(66,133,244,.25);
+  border-color:rgba(66,133,244,.6);
+  color:rgba(66,133,244,1);
+}
 /* 座標欄（地圖底部整合）*/
 #map-coord-bar{
   background:rgba(5,8,13,.92);
@@ -334,6 +361,80 @@
 .cb-val.red-dim{ color:rgba(255,61,87,.55); font-size:9px; font-weight:400; }
 .cb-dot.red{ background:#ff3d57;box-shadow:0 0 4px rgba(255,61,87,.6); }
 .cb-val.dim{ color:rgba(255,255,255,.5); }
+/* ── GPS 手動輸入 UI ─────────────────────────────────────────────────────── */
+/* 鉛筆 icon 按鈕 — 幾乎隱形，不干擾資料列 */
+.cb-btn-icon{
+  width:16px;height:16px;margin-left:auto;flex-shrink:0;
+  background:transparent;border:none;
+  color:rgba(66,133,244,.25);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  padding:0;transition:color .15s, opacity .15s;
+  pointer-events:all;border-radius:2px;
+}
+.cb-btn-icon:hover{ color:rgba(66,133,244,.7); }
+.cb-btn-icon.active{ color:rgba(240,165,0,.7); }
+
+/* 手動輸入列 — input + 套用鈕同排 */
+.gps-manual-wrap{
+  display:flex;flex-direction:column;gap:0;
+  margin-top:2px;
+}
+.gps-manual-inputs{
+  display:flex;gap:3px;align-items:center;
+}
+.gps-manual-input{
+  flex:1;min-width:0;
+  background:rgba(5,8,13,.7);
+  border:1px solid rgba(66,133,244,.22);
+  border-radius:2px;
+  color:rgba(66,133,244,.85);
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;
+  padding:3px 5px;
+  outline:none;
+  transition:border-color .15s;
+}
+.gps-manual-input:focus{
+  border-color:rgba(66,133,244,.55);
+  background:rgba(5,8,13,.9);
+}
+.gps-manual-input::placeholder{ color:rgba(66,133,244,.22); }
+.gps-manual-apply{
+  height:20px;padding:0 7px;flex-shrink:0;
+  background:rgba(66,133,244,.12);
+  border:1px solid rgba(66,133,244,.3);
+  border-radius:2px;
+  color:rgba(66,133,244,.8);
+  font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.3px;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;
+  pointer-events:all;
+}
+.gps-manual-apply:hover{ background:rgba(66,133,244,.22);border-color:rgba(66,133,244,.6);color:#7baeff; }
+
+/* 手動模式提示列 — 套用後替換輸入列 */
+.gps-manual-active{
+  display:flex;align-items:center;gap:5px;
+  margin-top:2px;padding:2px 0;
+}
+.gps-manual-active-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.8px;
+  color:rgba(240,165,0,.55);
+  text-transform:uppercase;
+}
+.gps-manual-reset{
+  margin-left:auto;
+  height:14px;padding:0 5px;
+  background:transparent;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:2px;
+  color:rgba(255,255,255,.28);
+  font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:.3px;
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;
+  pointer-events:all;
+}
+.gps-manual-reset:hover{ border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.6); }
 /* GPS 行內距離 */
 .cb-gps-dist{
   margin-left:auto;
@@ -442,6 +543,22 @@
 }
 #minimap-rsz svg{width:10px;height:10px;opacity:.6}
 #minimap-rsz:hover svg{opacity:1}
+/* 小地圖 Recenter 按鈕 */
+#minimap-recenter{
+  position:absolute;right:22px;bottom:0;z-index:9;
+  width:22px;height:22px;
+  background:rgba(8,14,24,.75);
+  border:none;border-top:1px solid rgba(255,255,255,.07);border-right:1px solid rgba(255,255,255,.07);
+  color:rgba(255,255,255,.28);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:color .15s,background .15s;
+  pointer-events:all;
+}
+#minimap-recenter:hover{
+  background:rgba(66,133,244,.15);
+  color:rgba(66,133,244,.9);
+}
 /* ROLL / PITCH 人工水平儀 (AHI) */
 .ahi-panel{
   position:absolute;bottom:14px;left:14px;z-index:8;
