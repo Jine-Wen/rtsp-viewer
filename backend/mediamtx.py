@@ -169,32 +169,46 @@ def sync_path(stream_id: str, rtsp_url: str):
                 logger.info(f"[{stream_id}] H264 {width}x{height} → GPU encode")
 
             elif gpu_ok and not is_hevc and needs_scale:
-                # ── H264 + GPU + 需要縮放：CPU 縮放 + libx264
-                # NOTE: h264_nvenc 最大支援寬度 4096，來源超過時改用 CPU 編碼避免失敗
+                # ── H264 + GPU + 需要縮放：檢查寬度後智能縮放
+                # NOTE: h264_nvenc 最大支援寬度 4096
+                # 如果寬度 > 4096，縮放至 3840；否則縮放至 1920
+                target_width = 3840 if width > 4096 else 1920
+                scale_filter = f'scale={target_width}:-2'
+                
                 ffmpeg_cmd = (
                     f"ffmpeg -rtsp_transport tcp"
                     f" -fflags nobuffer+discardcorrupt -flags low_delay"
                     f" -probesize 32 -analyzeduration 0"
                     f" -i {rtsp_url}"
-                    f' -vf "scale=1920:-2"'
+                    f' -vf "{scale_filter}"'
                     f" -c:v libx264 -tune zerolatency -preset superfast -crf 28"
                     f" -threads 8 -g 30 -sc_threshold 0 -an"
                     f" -f rtsp rtsp://localhost:8554/{stream_id}"
                 )
                 timeout = "30s"
-                mode = "scale→libx264 (width>{} → CPU)".format(width)
-                logger.warning(f"[{stream_id}] H264 {width}x{height} exceeds nvenc limit → scale + CPU encode")
+                mode = f"scale→libx264 ({width}→{target_width}px CPU encode)"
+                logger.warning(f"[{stream_id}] H264 {width}x{height} → auto-scaled to {target_width}px + CPU encode")
 
             else:
                 # ── CPU fallback（GPU 不可用）──
-                scale_filter = ' -vf "scale=1920:-2"' if needs_scale else ""
+                # 如果需要縮放，智能選擇目標寬度：
+                # - 寬度 > 4096: 縮放至 3840
+                # - 寬度 1920-4096: 縮放至 1920
+                # - 寬度 < 1920: 不縮放
+                if needs_scale:
+                    target_width = 3840 if width > 4096 else 1920
+                    scale_filter = f' -vf "scale={target_width}:-2"'
+                    logger.warning(f"[{stream_id}] {codec} {width}x{height} → auto-scaled to {target_width}px")
+                else:
+                    scale_filter = ""
+                
                 ffmpeg_cmd = (
                     f"ffmpeg -rtsp_transport tcp"
                     f" -fflags nobuffer+discardcorrupt -flags low_delay"
                     f" -probesize 32 -analyzeduration 0"
                     f" -i {rtsp_url}{scale_filter}"
                     f" -c:v libx264 -tune zerolatency -preset superfast -crf 28"
-                    f" -threads 8 -g 30 -sc_threshold 0 -an"
+                    f" -threads 8 -g 30 -sc_threshold 0 -r 30 -vsync cfr -an"
                     f" -f rtsp rtsp://localhost:8554/{stream_id}"
                 )
                 timeout = "30s"
@@ -348,4 +362,81 @@ def stop() -> bool:
         pass
 
     return stopped
+
+
+# ── 自動修復：監控日誌並修復失敗的配置 ────────────────────────────────────────
+
+def auto_fix_stream_config(stream_id: str, error_msg: str) -> bool:
+    """
+    監控 MediaMTX 日誌，偵測常見錯誤並自動修復配置。
+    
+    支援的自動修復：
+    - 寬度超過編碼器限制 → 自動縮放
+    - 編碼器不支援 → 自動改用 CPU 編碼
+    - GPU 不可用 → 自動 fallback CPU
+    
+    回傳 True 如果修復成功並已重新載入配置
+    """
+    try:
+        cfg = yml_load()
+        paths = cfg.get("paths") or {}
+        
+        if stream_id not in paths:
+            logger.warning(f"[auto_fix] Stream {stream_id} not found in config")
+            return False
+        
+        path_cfg = paths[stream_id]
+        runOnDemand = path_cfg.get("runOnDemand", "")
+        
+        logger.info(f"[auto_fix] Attempting to fix {stream_id}: {error_msg[:80]}")
+        
+        # ── 錯誤 1: 寬度超過 4096 (h264_nvenc 限制) ──
+        if "Width" in error_msg and "exceeds 4096" in error_msg:
+            if "h264_nvenc" in runOnDemand:
+                logger.warning(f"[auto_fix] {stream_id} h264_nvenc failed due to width → switching to CPU encode with scale")
+                # 改用 CPU 編碼並自動縮放
+                new_cmd = runOnDemand.replace("-c:v h264_nvenc", "-vf \"scale=3840:-2\" -c:v libx264")
+                path_cfg["runOnDemand"] = new_cmd
+                paths[stream_id] = path_cfg
+                cfg["paths"] = paths
+                yml_save(cfg)
+                logger.info(f"[auto_fix] {stream_id} config updated (h264_nvenc→libx264 with scale)")
+                return True
+        
+        # ── 錯誤 2: No capable devices found (GPU 不可用) ──
+        if "No capable devices found" in error_msg or "CUDA" in error_msg:
+            if "h264_nvenc" in runOnDemand or "hevc_cuvid" in runOnDemand:
+                logger.warning(f"[auto_fix] {stream_id} GPU encoding failed → switching to CPU encode")
+                # 改用 CPU 編碼
+                new_cmd = runOnDemand
+                # 移除 NVIDIA 特定參數
+                new_cmd = new_cmd.replace("-hwaccel cuda -hwaccel_output_format cuda -c:v hevc_cuvid", "")
+                new_cmd = new_cmd.replace("-c:v h264_nvenc -preset:v p1 -tune:v ll -zerolatency 1", "-c:v libx264 -tune zerolatency -preset superfast")
+                # 如果還沒有 libx264，添加
+                if "-c:v libx264" not in new_cmd:
+                    new_cmd = new_cmd.replace("-c:v h264", "-c:v libx264")
+                path_cfg["runOnDemand"] = new_cmd
+                paths[stream_id] = path_cfg
+                cfg["paths"] = paths
+                yml_save(cfg)
+                logger.info(f"[auto_fix] {stream_id} config updated (GPU→CPU encode)")
+                return True
+        
+        # ── 錯誤 3: Frame rate too high ──
+        if "Frame rate very high" in error_msg or "rate too high" in error_msg:
+            if "-vsync 2" not in runOnDemand and "-vsync cfr" not in runOnDemand:
+                logger.warning(f"[auto_fix] {stream_id} frame rate issue → adding vsync cfr")
+                new_cmd = runOnDemand.replace(" -an -f rtsp", " -r 30 -vsync cfr -an -f rtsp")
+                path_cfg["runOnDemand"] = new_cmd
+                paths[stream_id] = path_cfg
+                cfg["paths"] = paths
+                yml_save(cfg)
+                logger.info(f"[auto_fix] {stream_id} config updated (added -vsync cfr)")
+                return True
+        
+        logger.info(f"[auto_fix] No auto-fix available for: {error_msg[:100]}")
+        return False
+    except Exception as e:
+        logger.error(f"[auto_fix] Failed to auto-fix {stream_id}: {e}")
+        return False
 

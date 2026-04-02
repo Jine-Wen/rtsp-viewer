@@ -26,9 +26,9 @@ paths:
     runOnDemandCloseAfter: 10s
   jh2-main:
     runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
-      low_delay -hwaccel cuda -hwaccel_output_format cuda -c:v hevc_cuvid -i rtsp://10.66.66.119:8554/cam1
-      -vf "scale_cuda=1920:-2,hwdownload,format=nv12" -c:v libx264 -tune zerolatency
-      -preset ultrafast -crf 23 -g 30 -an -f rtsp rtsp://localhost:8554/jh2-main
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://10.66.66.125:8554/cam1
+      -vf "scale=1920:-2" -c:v libx264 -tune zerolatency -preset superfast -crf 28
+      -threads 8 -g 30 -sc_threshold 0 -an -f rtsp rtsp://localhost:8554/jh2-main
     runOnDemandRestart: true
     runOnDemandStartTimeout: 30s
     runOnDemandCloseAfter: 10s
@@ -40,15 +40,6 @@ paths:
     runOnDemandRestart: true
     runOnDemandStartTimeout: 30s
     runOnDemandCloseAfter: 10s
-  qg1-bridge:
-    runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
-      low_delay -probesize 32 -analyzeduration 0 -i rtsp://admin:password@192.168.1.103:554/Streaming/Channels/201
-      -c:v libx264 -profile:v baseline -tune zerolatency -preset ultrafast -b:v 800k
-      -maxrate 800k -bufsize 800k -g 15 -keyint_min 15 -an -bsf:v h264_mp4toannexb
-      -f rtsp rtsp://localhost:8554/qg1-bridge
-    runOnDemandRestart: true
-    runOnDemandCloseAfter: 10s
-    runOnDemandStartTimeout: 15s
   test-cctv:
     source: https://cctv-ss04.thb.gov.tw/T26-21K+323
     sourceOnDemand: true
@@ -67,11 +58,11 @@ paths:
     runOnDemandRestart: true
     runOnDemandStartTimeout: 30s
     runOnDemandCloseAfter: 10s
-  jh2--x2dh:
+  goingjs-k180-10jo:
     runOnDemand: ffmpeg -rtsp_transport tcp -fflags nobuffer+discardcorrupt -flags
-      low_delay -hwaccel cuda -hwaccel_output_format cuda -c:v hevc_cuvid -i rtsp://10.66.66.119:8554/cam1
-      -vf "scale_cuda=1920:-2,hwdownload,format=nv12" -c:v libx264 -tune zerolatency
-      -preset ultrafast -crf 23 -g 30 -an -f rtsp rtsp://localhost:8554/jh2--x2dh
+      low_delay -probesize 32 -analyzeduration 0 -i rtsp://10.66.66.118:8554/cam1
+      -vf "scale=3840:-2" -c:v libx264 -tune zerolatency -preset superfast -crf 28
+      -threads 8 -g 30 -sc_threshold 0 -r 30 -vsync cfr -an -f rtsp rtsp://localhost:8554/goingjs-k180-10jo
     runOnDemandRestart: true
     runOnDemandStartTimeout: 30s
     runOnDemandCloseAfter: 10s

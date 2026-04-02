@@ -4,6 +4,7 @@ import re
 import asyncio
 import logging
 from datetime import datetime
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -14,6 +15,9 @@ from streams import StreamManager
 import mediamtx
 
 logger = logging.getLogger(__name__)
+
+# 記錄上次檢查的日誌位置，避免重複檢查
+_last_log_positions = {}
 
 router = APIRouter()
 
@@ -86,8 +90,15 @@ async def delete_stream(stream_id: str):
 # ── Start / Stop / Refresh ────────────────────────────────────────────────────
 
 @router.post("/api/streams/{stream_id}/start")
-async def start_stream(stream_id: str):
-    """啟動串流：依 URL 類型決定啟動方式（若 MediaMTX 未啟動則先啟動它）"""
+async def start_stream(stream_id: str, retry_count: int = 0):
+    """
+    啟動串流：依 URL 類型決定啟動方式（若 MediaMTX 未啟動則先啟動它）
+    
+    自動修復機制：
+    - 如果流啟動失敗，自動檢查日誌
+    - 偵測常見編碼器錯誤（寬度超限、GPU 不可用等）
+    - 自動修改配置並重試啟動（最多 2 次重試）
+    """
     if stream_id not in manager.streams:
         raise HTTPException(status_code=404, detail=f"Stream {stream_id} not found")
 
@@ -151,6 +162,50 @@ async def start_stream(stream_id: str):
         "status": "starting",
         "last_checked": datetime.now().isoformat(),
     }
+    
+    # 自動修復：檢查最新的日誌，看是否有錯誤
+    # 延遲 3 秒讓 ffmpeg 有時間啟動
+    await asyncio.sleep(3)
+    
+    try:
+        log_path = Path("mediamtx.log")
+        if log_path.exists():
+            # 讀取最後 100 行日誌，尋找該流的錯誤訊息
+            with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                recent_logs = f.readlines()[-100:]
+            
+            recent_text = "".join(recent_logs)
+            
+            # 檢查是否包含常見錯誤
+            error_keywords = ["Width", "exceeds", "Error initializing", "No capable", "CUDA_ERROR", "encoder", "Conversion failed"]
+            has_error = any(keyword in recent_text for keyword in error_keywords)
+            
+            if has_error and retry_count < 2:
+                logger.warning(f"[start_stream] {stream_id} failed (detected error in logs), attempting auto-fix...")
+                # 提取錯誤訊息
+                error_lines = [line for line in recent_logs if any(kw in line for kw in error_keywords)]
+                error_msg = " ".join(error_lines[-3:]) if error_lines else ""
+                
+                # 嘗試自動修復
+                fixed = await asyncio.get_event_loop().run_in_executor(
+                    None, mediamtx.auto_fix_stream_config, stream_id, error_msg
+                )
+                
+                if fixed:
+                    logger.info(f"[start_stream] {stream_id} auto-fixed, reloading configuration...")
+                    # 重新載入 MediaMTX 配置
+                    try:
+                        async with httpx.AsyncClient(timeout=5) as client:
+                            await client.post(f"{MEDIAMTX_API}/v3/config/reload")
+                    except Exception as e:
+                        logger.warning(f"[start_stream] Failed to reload config: {e}")
+                    
+                    # 遞迴重試（最多重試 2 次）
+                    await asyncio.sleep(2)
+                    return await start_stream(stream_id, retry_count=retry_count + 1)
+    except Exception as e:
+        logger.debug(f"[start_stream] Auto-fix check failed: {e}")
+    
     logger.info(f"Stream {stream_id} marked as starting (runOnDemand will trigger on first WHEP connect)")
     return {"status": "starting", "id": stream_id}
 
